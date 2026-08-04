@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>내 프로젝트에 LangGraph가 필요한가 — AI 프로젝트를 만드는 사람을 위한 도입부</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#16130F; --ink-1:#1D1914; --ink-2:#26211A; --line:#3B342B;
+  --paper:#F2ECE2; --dim:#B9AF9D; --muted:#8E8474;
+  --state:#E3A33C;   /* State */
+  --node:#6FB6A9;    /* Node */
+  --edge:#8E8474;    /* Edge */
+  --loop:#C56A82;    /* 순환 · 주의 */
+  --sans:'Pretendard Variable',Pretendard,-apple-system,'Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+  --mono:'JetBrains Mono','D2Coding',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--ink);color:var(--paper);font-family:var(--sans);overflow:hidden;
+  display:flex;align-items:center;justify-content:center;-webkit-font-smoothing:antialiased}
+#viewport{width:100%;height:100%;display:flex;align-items:center;justify-content:center}
+#stage{position:relative;width:1280px;height:720px;flex:none;transform-origin:center center;background:var(--ink);
+  background-image:
+    radial-gradient(900px 480px at 12% -10%, rgba(227,163,60,.09), transparent 62%),
+    radial-gradient(700px 420px at 96% 108%, rgba(111,182,169,.07), transparent 60%),
+    radial-gradient(circle at 1px 1px, rgba(242,236,226,.055) 1px, transparent 0);
+  background-size:auto,auto,32px 32px;overflow:hidden}
+.slide{position:absolute;inset:0;padding:50px 68px 92px;display:flex;flex-direction:column;
+  opacity:0;visibility:hidden;transform:translateY(10px);transition:opacity .32s ease,transform .32s ease}
+.slide.is-active{opacity:1;visibility:visible;transform:none}
+
+.eyebrow{font-family:var(--mono);font-size:12.5px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--state);display:flex;align-items:center;gap:10px}
+.eyebrow::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--line),transparent)}
+h2.t{font-size:36px;font-weight:800;letter-spacing:-.02em;line-height:1.2;margin:12px 0 6px}
+h2.t em{font-style:normal;color:var(--state)}
+h2.t em.n{color:var(--node)} h2.t em.l{color:var(--loop)}
+.lede{font-size:16.5px;color:var(--dim);line-height:1.6;max-width:980px}
+.body{margin-top:auto;margin-bottom:auto;width:100%}
+p,li{font-size:16.5px;line-height:1.6}
+strong{font-weight:700;color:#fff}
+.mn{font-family:var(--mono);font-size:.94em;color:var(--node)}
+.c-s{color:var(--state)}.c-n{color:var(--node)}.c-l{color:var(--loop)}
+
+.s-cover{padding:0}
+.cover{display:grid;grid-template-columns:1.02fr .98fr;height:100%;align-items:center;gap:26px;padding:0 68px 60px}
+.cover-title{font-size:54px;font-weight:800;letter-spacing:-.035em;line-height:1.15;margin:16px 0 20px}
+.cover-title em{font-style:normal;color:var(--state)}
+.cover-sub{font-size:17.5px;color:var(--dim);line-height:1.65;max-width:460px}
+.cover-meta{list-style:none;display:flex;gap:8px;flex-wrap:wrap;margin-top:28px}
+.cover-meta li{font-family:var(--mono);font-size:12px;color:var(--dim);border:1px solid var(--line);
+  border-radius:999px;padding:7px 13px}
+
+.cols{display:grid;gap:22px}
+.c2{grid-template-columns:1fr 1fr}
+.c2a{grid-template-columns:1.12fr .88fr}
+.c2b{grid-template-columns:.88fr 1.12fr}
+.c3{grid-template-columns:repeat(3,1fr)}
+.card{background:var(--ink-1);border:1px solid var(--line);border-radius:14px;padding:19px 20px 17px}
+.card h3{font-size:17.5px;font-weight:700;margin-bottom:8px;letter-spacing:-.01em}
+.card p{font-size:14.8px;color:var(--dim);line-height:1.58}
+.card .tag{font-family:var(--mono);font-size:11px;letter-spacing:.12em;color:var(--muted);display:block;margin-bottom:10px}
+.card.k-s{border-top:2px solid var(--state)}
+.card.k-n{border-top:2px solid var(--node)}
+.card.k-l{border-top:2px solid var(--loop)}
+
+.chips{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}
+.chip{font-size:14px;color:var(--dim);border:1px solid var(--line);border-radius:10px;padding:9px 13px;
+  background:var(--ink-1);line-height:1.45}
+.chip b{color:var(--paper);font-weight:700}
+
+.note{margin-top:16px;border-left:2px solid var(--state);background:rgba(227,163,60,.06);
+  padding:13px 18px;border-radius:0 10px 10px 0;font-size:15.5px;color:var(--dim);line-height:1.58}
+.note.loop{border-left-color:var(--loop);background:rgba(197,106,130,.07)}
+.note.node{border-left-color:var(--node);background:rgba(111,182,169,.06)}
+.note b{color:var(--paper)}
+
+table.tb{width:100%;border-collapse:collapse}
+table.tb th,table.tb td{text-align:left;padding:11px 13px;border-bottom:1px solid var(--line);font-size:15.5px}
+table.tb th{font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:var(--muted);text-transform:uppercase;font-weight:500}
+table.tb td.vd{font-family:var(--mono);font-size:13.5px}
+table.tb.sm th,table.tb.sm td{padding:8px 11px;font-size:14.5px}
+table.tb tr.hi td{background:rgba(227,163,60,.07)}
+
+.checks{list-style:none;display:grid;gap:10px;margin-top:4px}
+.checks li{display:flex;gap:11px;font-size:15.5px;color:var(--dim);line-height:1.45;align-items:flex-start}
+.checks li::before{content:'';width:14px;height:14px;border:1.4px solid var(--muted);border-radius:3px;flex:none;margin-top:4px}
+.checks li b{color:var(--paper);font-weight:600}
+
+.flow{display:flex;align-items:stretch}
+.flow .fx{flex:1;background:var(--ink-1);border:1px solid var(--line);border-radius:12px;padding:15px 15px 13px;border-top:2px solid var(--node)}
+.flow .ar{flex:none;width:28px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:17px}
+.flow .st{font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:var(--node);display:block;margin-bottom:7px}
+.flow h4{font-size:15.5px;font-weight:700;margin-bottom:5px;line-height:1.3}
+.flow p{font-size:13px;color:var(--dim);line-height:1.48}
+.flow .fig{font-family:var(--mono);font-size:12.5px;margin-top:8px;display:block;line-height:1.45;color:var(--state)}
+
+.code{background:#120F0B;border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
+.code .bar{display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--line);
+  font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:var(--muted);background:rgba(242,236,226,.02)}
+.code .bar i{width:7px;height:7px;border-radius:50%;background:var(--line);display:block}
+.code pre{padding:15px 18px;overflow:hidden}
+.code code{font-family:var(--mono);font-size:13.4px;line-height:1.68;color:#DCD4C6;white-space:pre;display:block}
+.code.sm code{font-size:12.6px;line-height:1.62}
+.tk-c{color:#6E6558;font-style:italic}.tk-s{color:#D9A05B}.tk-k{color:#C56A82}.tk-n{color:#8FBF9B}.tk-f{color:#6FB6A9}
+
+.dg{display:block;margin:0 auto}
+.dg text{font-family:var(--sans);fill:var(--paper)}
+.dg .mono{font-family:var(--mono)}
+.dg .nd{fill:var(--ink-2);stroke:var(--node);stroke-width:1.5}
+.dg .nd-dim{fill:var(--ink-1);stroke:var(--line)}
+.dg .nt{fill:var(--paper);font-family:var(--mono);font-size:14px;font-weight:500;text-anchor:middle}
+.dg .nt-k{fill:var(--paper);font-size:14.5px;font-weight:600;text-anchor:middle}
+.dg .term{fill:none;stroke:var(--line)}
+.dg .term-t{fill:var(--muted);font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.1em;text-anchor:middle}
+.dg .e{stroke:var(--edge);stroke-width:1.7;fill:none;marker-end:url(#ah-e)}
+.dg .e-c{stroke:var(--node);stroke-width:1.7;fill:none;stroke-dasharray:6 5;marker-end:url(#ah-n)}
+.dg .e-l{stroke:var(--loop);stroke-width:1.7;fill:none;marker-end:url(#ah-l)}
+.dg .e-s{stroke:var(--state);stroke-width:1.4;fill:none;stroke-dasharray:2 4;opacity:.85}
+.dg .lb{fill:var(--muted);font-family:var(--mono);font-size:12px;text-anchor:middle}
+.dg .lb-c{fill:var(--node);font-size:12.5px;font-weight:600;text-anchor:middle}
+.dg .lb-l{fill:var(--loop);font-family:var(--mono);font-size:12px;text-anchor:middle}
+.dg .sbox{fill:rgba(227,163,60,.06);stroke:var(--state);stroke-width:1.3;stroke-dasharray:5 4}
+.dg .st{fill:var(--state);font-size:14px;font-weight:700}
+.dg .sm{fill:var(--dim);font-family:var(--mono);font-size:12.5px}
+.dg .rt{fill:var(--node);font-family:var(--mono);font-size:12.5px;font-weight:600;text-anchor:middle}
+
+#rail{position:absolute;left:68px;right:68px;bottom:30px;height:42px}
+#rail ol{list-style:none;display:flex;justify-content:space-between;position:relative;padding-top:6px}
+#rail::before{content:'';position:absolute;left:14px;right:120px;top:11px;height:1px;background:var(--line)}
+#rail li{position:relative;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;z-index:2}
+#rail .dot{width:9px;height:9px;border-radius:50%;background:var(--ink);border:1.5px solid var(--line);transition:.25s}
+#rail .lb{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;color:var(--muted);transition:.25s}
+#rail li.done .dot{background:var(--edge);border-color:var(--edge)}
+#rail li.on .dot{background:var(--state);border-color:var(--state);box-shadow:0 0 0 4px rgba(227,163,60,.16)}
+#rail li.on .lb{color:var(--state)}
+#rail li:hover .lb{color:var(--dim)}
+#rail .arc{position:absolute;right:76px;top:-14px;pointer-events:none;opacity:.55}
+#hud{position:absolute;right:68px;bottom:34px;display:flex;align-items:center;gap:14px;
+  font-family:var(--mono);font-size:12px;color:var(--muted)}
+#hud button{width:26px;height:26px;border-radius:7px;border:1px solid var(--line);background:transparent;
+  color:var(--dim);font-size:13px;cursor:pointer;line-height:1;font-family:var(--mono)}
+#hud button:hover{border-color:var(--edge);color:var(--paper)}
+#hud button:focus-visible,#rail li:focus-visible{outline:2px solid var(--state);outline-offset:3px}
+#count b{color:var(--paper);font-weight:700}
+
+@media (prefers-reduced-motion:reduce){.slide{transition:none}}
+@media print{
+  body,#viewport{display:block;overflow:visible;height:auto}
+  #stage{transform:none!important;width:1280px;height:auto}
+  .slide{position:relative;inset:auto;opacity:1;visibility:visible;transform:none;height:720px;page-break-after:always}
+  @page{size:1280px 720px;margin:0}
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <marker id="ah-e" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8E8474"/></marker>
+  <marker id="ah-n" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6FB6A9"/></marker>
+  <marker id="ah-l" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#C56A82"/></marker>
+  <marker id="ah-s" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#E3A33C"/></marker>
+</defs></svg>
+
+<div id="viewport">
+<div id="stage">
+
+<!-- 1 ── 표지 -->
+<section class="slide s-cover is-active" data-ch="0">
+  <div class="cover">
+    <div>
+      <p class="eyebrow">AI 프로젝트 도입부 · 14~15주차</p>
+      <h1 class="cover-title">내 프로젝트에<br><em>LangGraph가 필요한가</em></h1>
+      <p class="cover-sub">새 라이브러리를 하나 더 배우기 전에, 그게 내 프로젝트에 필요한지부터 판단합니다. 필요 없으면 LCEL로 끝내는 것이 맞습니다.</p>
+      <ul class="cover-meta"><li>판단 기준 4문항</li><li>에이전트 루프 뼈대</li><li>자주 나는 사고</li></ul>
+    </div>
+    <div>
+      <svg class="dg" width="500" height="330" viewBox="0 0 500 330" role="img" aria-label="직선과 순환 비교">
+        <text class="lb" x="16" y="16" style="text-anchor:start;fill:#8E8474">미리 정한 길 · LCEL</text>
+        <rect class="nd nd-dim" x="16" y="34" width="96" height="42" rx="10"/><text class="nt" x="64" y="60" style="font-size:12.5px">질문</text>
+        <path class="e" d="M112 55 L136 55"/>
+        <rect class="nd nd-dim" x="144" y="34" width="96" height="42" rx="10"/><text class="nt" x="192" y="60" style="font-size:12.5px">검색</text>
+        <path class="e" d="M240 55 L264 55"/>
+        <rect class="nd nd-dim" x="272" y="34" width="96" height="42" rx="10"/><text class="nt" x="320" y="60" style="font-size:12.5px">생성</text>
+        <path class="e" d="M368 55 L392 55"/>
+        <text class="term-t" x="424" y="60">답변</text>
+        <text class="lb" x="216" y="102" style="fill:#8E8474">항상 같은 순서 — 갈림길도 되돌아옴도 없음</text>
+
+        <line x1="16" y1="128" x2="484" y2="128" stroke="#3B342B"/>
+
+        <text class="lb" x="16" y="158" style="text-anchor:start;fill:#E3A33C">실행 중에 정하는 길 · LangGraph</text>
+        <rect class="sbox" x="16" y="172" width="468" height="42" rx="11"/>
+        <text class="st" x="34" y="198" style="font-size:13px">State — 대화와 도구 결과가 쌓이는 곳</text>
+
+        <rect class="nd" x="60" y="238" width="150" height="54" rx="12"/>
+        <text class="nt-k" x="135" y="264">판단</text><text class="lb" x="135" y="282" style="fill:#8E8474">무엇을 할까</text>
+        <path class="e-s" d="M135 238 L135 216" marker-end="url(#ah-s)" marker-start="url(#ah-s)"/>
+        <rect class="nd" x="300" y="238" width="150" height="54" rx="12" style="stroke:#C56A82"/>
+        <text class="nt-k" x="375" y="264">행동</text><text class="lb" x="375" y="282" style="fill:#8E8474">도구 실행</text>
+        <path class="e-s" d="M375 238 L375 216" marker-end="url(#ah-s)" marker-start="url(#ah-s)"/>
+        <path class="e-c" d="M210 254 L292 254"/>
+        <path class="e-l" d="M300 278 L218 278"/>
+        <text class="lb-c" x="251" y="244">도구가 필요하면</text>
+        <text class="lb-l" x="251" y="300">결과를 보고 다시</text>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- 2 ── 한 줄 정리 -->
+<section class="slide" data-ch="0">
+  <p class="eyebrow">한 줄로</p>
+  <h2 class="t">길을 <em>미리 정하느냐</em>, 실행 중에 <em class="l">스스로 정하느냐</em></h2>
+  <div class="body cols c2">
+    <div class="card k-n"><span class="tag">LCEL로 충분한 프로젝트</span><h3>미리 정한 길을 따라간다</h3>
+      <p>“질문 → 검색 → 생성 → 답변”처럼 <strong>순서가 코드를 짤 때 이미 결정되어 있는</strong> 작업. 11~13주차 RAG가 여기에 해당합니다.</p>
+      <div class="chips"><span class="chip">문서 QA 챗봇</span><span class="chip">요약 파이프라인</span><span class="chip">번역·분류 배치</span></div>
+    </div>
+    <div class="card k-l"><span class="tag">LangGraph가 필요한 프로젝트</span><h3>실행 중에 다음 수를 정한다</h3>
+      <p>LLM이 <strong>매 스텝마다 무엇을 할지 스스로 결정</strong>하는 작업. 이게 에이전트이고, 직선으로는 그릴 수 없습니다.</p>
+      <div class="chips"><span class="chip">도구 쓰는 어시스턴트</span><span class="chip">다단계 리서치</span><span class="chip">멀티에이전트 협업</span></div>
+    </div>
+  </div>
+  <div class="note" style="margin-top:0"><b>주의</b> — “요즘 다들 쓰니까”는 이유가 아닙니다. 흐름이 고정된 프로젝트에 LangGraph를 얹으면 코드만 길어지고 얻는 게 없습니다. 다음 장에서 필요 여부를 먼저 판정합니다.</div>
+</section>
+
+<!-- 3 ── 판단 4문항 -->
+<section class="slide" data-ch="1">
+  <p class="eyebrow">판단 · 4문항</p>
+  <h2 class="t">내 프로젝트, <em>몇 개나 해당되나</em></h2>
+  <div class="body cols c2a" style="align-items:start">
+    <div class="card">
+      <span class="tag">해당되는 항목에 체크</span>
+      <ul class="checks">
+        <li><b>다음 단계가 실행 중에 달라지는가</b> — 상황에 따라 검색을 할 수도, 계산기를 쓸 수도, 그냥 답할 수도 있다</li>
+        <li><b>같은 일을 조건이 될 때까지 되풀이하는가</b> — 결과가 부족하면 다시 검색해서 보강해야 한다</li>
+        <li><b>여러 단계가 데이터를 공유하고 누적하는가</b> — 앞 단계 결과를 뒤에서 계속 참조한다</li>
+        <li><b>대화를 세션별로 이어야 하는가</b> — 사용자별로 이전 대화를 기억해야 한다</li>
+      </ul>
+    </div>
+    <div>
+      <div class="card k-n"><span class="tag">0개</span><h3>LCEL로 끝내세요</h3>
+        <p>체인 하나로 충분합니다. 그래프를 얹을 이유가 없습니다.</p></div>
+      <div class="card k-s" style="margin-top:12px"><span class="tag">1~2개</span><h3>부분적으로 도입</h3>
+        <p>필요한 부분만 그래프로. 나머지는 기존 체인을 노드 안에서 그대로 호출하면 됩니다.</p></div>
+      <div class="card k-l" style="margin-top:12px"><span class="tag">3개 이상</span><h3>처음부터 LangGraph</h3>
+        <p>나중에 옮기면 구조를 다시 짜야 합니다. 시작할 때 그래프로 잡으세요.</p></div>
+    </div>
+  </div>
+  <div class="note node" style="margin-top:0">기존 체인은 <b>버리지 않습니다.</b> 노드 함수 안에서 <span class="mn">chain.invoke(...)</span>를 호출하면 그대로 살아납니다. 노드는 그냥 파이썬 함수이기 때문입니다.</div>
+</section>
+
+<!-- 4 ── 비교표 -->
+<section class="slide" data-ch="1">
+  <p class="eyebrow">비교 · 무엇이 안 되는가</p>
+  <h2 class="t">LCEL은 <em class="l">한 방향으로만</em> 흐른다</h2>
+  <div class="body">
+    <p class="lede" style="margin-bottom:16px">LCEL(<span class="mn">|</span>)이 만드는 흐름은 근본적으로 <strong>순환 없는 그래프(DAG)</strong>입니다. 그래서 다음이 안 되거나, 억지로 하면 코드가 무너집니다.</p>
+    <table class="tb">
+      <tr><th>필요한 능력</th><th>직선 체인 (LCEL)</th><th>LangGraph</th><th>프로젝트에서 언제 걸리나</th></tr>
+      <tr><td><strong>조건 분기</strong></td><td class="c-l">표현하기 어렵다</td><td class="vd c-n">add_conditional_edges</td><td>도구를 쓸지 말지 매번 달라질 때</td></tr>
+      <tr class="hi"><td><strong>반복 (순환)</strong></td><td class="c-l">불가 — DAG이므로</td><td class="vd c-n">순환 허용</td><td>답이 부족해 다시 시도해야 할 때</td></tr>
+      <tr><td><strong>상태 공유·누적</strong></td><td class="c-l">직접 관리해야 한다</td><td class="vd c-n">State + Reducer</td><td>도구 결과를 계속 쌓아야 할 때</td></tr>
+      <tr><td><strong>대화 기억·재개</strong></td><td class="c-l">없다</td><td class="vd c-n">Checkpointer</td><td>멀티턴 챗봇을 만들 때</td></tr>
+      <tr><td><strong>흐름 관찰·개입</strong></td><td class="c-l">어렵다</td><td class="vd c-n">노드 단위 제어·시각화</td><td>어디서 틀렸는지 찾아야 할 때</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- 5 ── 순환 -->
+<section class="slide" data-ch="2">
+  <p class="eyebrow">핵심 · 순환</p>
+  <h2 class="t">가장 큰 차이는 <em class="l">되돌아오는 화살표</em> 하나</h2>
+  <div class="body cols c2b" style="align-items:center">
+    <div>
+      <svg class="dg" width="440" height="270" viewBox="0 0 440 270" role="img" aria-label="DAG와 순환 그래프 비교">
+        <text class="lb" x="10" y="16" style="text-anchor:start;fill:#8E8474">DAG — 순환 없는 그래프</text>
+        <rect class="nd nd-dim" x="10" y="34" width="110" height="46" rx="11"/><text class="nt" x="65" y="62" style="font-size:13px">A</text>
+        <path class="e" d="M120 57 L152 57"/>
+        <rect class="nd nd-dim" x="160" y="34" width="110" height="46" rx="11"/><text class="nt" x="215" y="62" style="font-size:13px">B</text>
+        <path class="e" d="M270 57 L302 57"/>
+        <rect class="nd nd-dim" x="310" y="34" width="110" height="46" rx="11"/><text class="nt" x="365" y="62" style="font-size:13px">C</text>
+        <path d="M310 96 C 250 122, 130 122, 70 92" fill="none" stroke="#C56A82" stroke-width="1.5" stroke-dasharray="4 4" opacity=".65"/>
+        <text x="190" y="126" style="font-size:19px;fill:#C56A82;text-anchor:middle">✕</text>
+        <text class="lb-l" x="278" y="126">이 화살표를 그릴 수 없다</text>
+
+        <line x1="10" y1="150" x2="430" y2="150" stroke="#3B342B"/>
+
+        <text class="lb" x="10" y="176" style="text-anchor:start;fill:#E3A33C">LangGraph — 순환 허용</text>
+        <rect class="nd" x="60" y="196" width="140" height="50" rx="12"/><text class="nt-k" x="130" y="226">생각</text>
+        <rect class="nd" x="250" y="196" width="140" height="50" rx="12" style="stroke:#C56A82"/><text class="nt-k" x="320" y="226">행동</text>
+        <path class="e-c" d="M200 212 L242 212"/>
+        <path class="e-l" d="M250 234 L208 234"/>
+        <text class="lb" x="225" y="264" style="fill:#8E8474">관찰 → 다시 생각</text>
+      </svg>
+    </div>
+    <div>
+      <div class="card k-l"><span class="tag">에이전트의 본질</span><h3>답이 나올 때까지 되풀이한다</h3>
+        <p><strong>생각 → 행동 → 관찰 → 다시 생각.</strong> 몇 바퀴 돌지는 <strong>실행해 봐야 압니다.</strong> 코드를 짤 때 정할 수 없는 값이죠. DAG는 이 되돌아오는 화살표 자체가 불가능하므로, 에이전트를 표현할 수 없습니다.</p></div>
+      <div class="note loop">그래서 “LangGraph를 왜 쓰나요”의 답은 한 단어로 <b>순환</b>입니다. 조건 분기와 상태는 그 순환을 쓸모 있게 만드는 부품입니다.</div>
+    </div>
+  </div>
+</section>
+
+<!-- 6 ── while문 -->
+<section class="slide" data-ch="2">
+  <p class="eyebrow">자주 나오는 질문</p>
+  <h2 class="t">“그냥 <em class="l">while문</em>으로 짜면 되지 않나요?”</h2>
+  <div class="body">
+    <p class="lede" style="margin-bottom:18px"><strong>됩니다.</strong> 프로토타입이라면 오히려 그게 빠를 수도 있습니다. 다만 프로젝트가 커지면 아래를 전부 직접 만들게 됩니다.</p>
+    <div class="cols c3">
+      <div class="card k-n"><span class="tag">직접 만들어야 하는 것 ①</span><h3>상태 관리</h3><p>대화와 도구 결과를 어디에 어떻게 쌓을지, 덮어쓸지 이어붙일지 매번 정해야 합니다.</p></div>
+      <div class="card k-n"><span class="tag">② ③</span><h3>대화 저장 · 스트리밍</h3><p>세션별 기억(체크포인터)과 토큰 단위 출력. 둘 다 직접 만들면 꽤 큰 작업입니다.</p></div>
+      <div class="card k-n"><span class="tag">④ ⑤</span><h3>중단·재개 · 사람 개입</h3><p>중간에 멈췄다 이어가기, 위험한 도구 실행 전 승인받기.</p></div>
+    </div>
+    <div class="cols c2" style="margin-top:20px">
+      <div class="note loop" style="margin-top:0"><b>더 큰 문제는 가시성입니다.</b> while문으로 짜면 흐름이 코드 속에 숨습니다. 어디서 잘못됐는지 찾으려면 코드를 처음부터 읽어야 합니다.</div>
+      <div class="note node" style="margin-top:0"><b>LangGraph는 흐름이 노드와 엣지로 보입니다.</b> <span class="mn">draw_mermaid()</span> 한 줄이면 그림이 나오고, 그 그림이 곧 발표 자료이자 디버깅 지도가 됩니다.</div>
+    </div>
+  </div>
+</section>
+
+<!-- 7 ── 역할 분담 -->
+<section class="slide" data-ch="3">
+  <p class="eyebrow">역할 · 분담</p>
+  <h2 class="t">LLM은 <em>판단</em>, LangGraph는 <em class="n">실행과 흐름</em></h2>
+  <div class="body">
+    <table class="tb">
+      <tr><th></th><th>역할</th><th>담당하는 일</th></tr>
+      <tr><td style="width:190px"><strong class="c-s" style="font-size:19px">LLM</strong><br><span style="color:var(--muted);font-size:13.5px">두뇌</span></td>
+          <td style="width:190px"><strong>판단</strong><br><span style="color:var(--muted);font-size:14px">무엇을 할지</span></td>
+          <td>도구를 쓸까? 어떤 도구에 어떤 값을 넣을까? 이제 답해도 될까?</td></tr>
+      <tr><td><strong class="c-n" style="font-size:19px">LangGraph</strong><br><span style="color:var(--muted);font-size:13.5px">신경계 · 골격</span></td>
+          <td><strong>실행 · 흐름</strong><br><span style="color:var(--muted);font-size:14px">어떻게 돌릴지</span></td>
+          <td>도구를 실제로 실행하고, 결과를 다시 LLM에게 전달하고, 분기·반복·상태·기억을 관리하고, 언제 멈출지 통제한다</td></tr>
+    </table>
+    <div class="cols c2" style="margin-top:24px">
+      <div class="note" style="margin-top:0">LLM은 <b>“무엇을 할지” 결정만</b> 합니다. 그 결정을 실제 동작으로 옮기는 것은 전부 LangGraph 쪽 일입니다. 이 경계를 헷갈리면 프롬프트로 해결할 문제와 그래프로 해결할 문제가 뒤섞입니다.</div>
+      <div class="note node" style="margin-top:0"><b>디버깅에 바로 쓰입니다.</b> 도구를 엉뚱하게 골랐다 → LLM(프롬프트·도구 설명) 문제. 도구는 맞는데 결과가 반영이 안 된다 → 그래프(상태·엣지) 문제.</div>
+    </div>
+  </div>
+</section>
+
+<!-- 8 ── 루프 뼈대 -->
+<section class="slide" data-ch="3">
+  <p class="eyebrow">뼈대 · 에이전트 루프</p>
+  <h2 class="t">노드 두 개와 <em class="n">분기 하나</em>가 전부다</h2>
+  <div class="body cols c2b" style="align-items:start">
+    <div>
+      <svg class="dg" width="470" height="290" viewBox="0 0 470 290" role="img" aria-label="chatbot과 tools를 잇는 에이전트 루프">
+        <rect class="sbox" x="20" y="6" width="430" height="48" rx="11"/>
+        <text class="st" x="38" y="28" style="font-size:13px">State · messages</text>
+        <text class="sm" x="38" y="46">대화와 도구 결과가 add_messages로 쌓인다</text>
+
+        <rect class="nd" x="120" y="84" width="170" height="52" rx="12" style="stroke:#C56A82"/>
+        <text class="nt" x="205" y="115">tools</text>
+        <path class="e-s" d="M300 84 L300 54" marker-end="url(#ah-s)" marker-start="url(#ah-s)"/>
+
+        <rect class="term" x="0" y="190" width="68" height="34" rx="17"/><text class="term-t" x="34" y="212">START</text>
+        <path class="e" d="M68 207 L92 207"/>
+        <rect class="nd" x="100" y="178" width="170" height="58" rx="13"/>
+        <text class="nt" x="185" y="204">chatbot</text><text class="lb" x="185" y="224">판단</text>
+        <path class="e" d="M270 207 L310 207"/>
+        <g><path d="M318 207 L380 171 L442 207 L380 243 Z" fill="rgba(111,182,169,.08)" stroke="#6FB6A9" stroke-width="1.5"/>
+        <text class="rt" x="380" y="204">tools_</text><text class="rt" x="380" y="219">condition</text></g>
+        <path class="e-c" d="M380 171 C 380 132, 366 110, 298 110"/>
+        <text class="lb-c" x="418" y="140">도구 요청 있음</text>
+        <path class="e-l" d="M200 136 L200 172"/>
+        <text class="lb-l" x="118" y="160">결과 들고 복귀</text>
+        <path class="e-c" d="M442 207 L462 207"/>
+        <text class="lb-c" x="400" y="262">없으면 종료</text>
+        <text class="term-t" x="450" y="240">END</text>
+      </svg>
+      <div class="note node" style="margin-top:10px"><b>이 그림이 15주차 전부입니다.</b> 나머지는 여기에 도구를 늘리고, 메모리와 안전장치를 얹는 일입니다.</div>
+    </div>
+    <div class="code sm">
+      <div class="bar"><i></i>agent_skeleton.py</div>
+      <pre><code>from langgraph.prebuilt import ToolNode, tools_condition
+from langgraph.checkpoint.memory import MemorySaver
+
+class State(TypedDict):
+    messages: Annotated[list, add_messages]   # 쌓인다
+
+def chatbot(state: State):                    # 판단
+    return {"messages": [llm_with_tools.invoke(state["messages"])]}
+
+builder = StateGraph(State)
+builder.add_node("chatbot", chatbot)
+builder.add_node("tools", ToolNode(tools))    # 실행
+
+builder.add_edge(START, "chatbot")
+builder.add_conditional_edges("chatbot", tools_condition)
+builder.add_edge("tools", "chatbot")          # ← 순환
+
+graph = builder.compile(checkpointer=MemorySaver())
+
+config = {"configurable": {"thread_id": "user-123"}}
+graph.invoke({"messages": [("user", "...")]}, config)</code></pre>
+    </div>
+  </div>
+</section>
+
+<!-- 9 ── 다섯 가지 -->
+<section class="slide" data-ch="3">
+  <p class="eyebrow">역할 · 구체화</p>
+  <h2 class="t">그래서 LangGraph가 <em class="n">해주는 다섯 가지</em></h2>
+  <div class="body">
+    <div class="cols c3">
+      <div class="card k-l"><span class="tag">① 루프의 뼈대</span><h3>생각 → 행동 → 관찰 → 반복</h3>
+        <p><span class="mn">chatbot</span> ↔ <span class="mn">tools</span>를 조건 분기로 이은 순환 구조. 에이전트의 심장입니다.</p></div>
+      <div class="card k-n"><span class="tag">② 자율적 라우팅</span><h3>스스로 경로를 고른다</h3>
+        <p><span class="mn">tools_condition</span>이 “도구를 요청했으면 tools로, 아니면 종료”를 판정합니다. 에이전트의 자율성이 여기서 나옵니다.</p></div>
+      <div class="card k-s"><span class="tag">③ 상태로 맥락 유지</span><h3>매 스텝 전체를 보고 판단</h3>
+        <p><span class="mn">messages</span>에 대화와 도구 결과가 <span class="mn">add_messages</span>로 쌓여, LLM이 항상 전체 맥락 위에서 결정합니다.</p></div>
+    </div>
+    <div class="cols c3" style="margin-top:18px">
+      <div class="card k-s"><span class="tag">④ 멀티턴 메모리</span><h3>세션별로 기억한다</h3>
+        <p><span class="mn">checkpointer</span> + <span class="mn">thread_id</span>. 사용자마다 대화가 따로 이어집니다.</p></div>
+      <div class="card k-l"><span class="tag">⑤ 안전장치와 제어</span><h3>자율성을 통제 가능하게</h3>
+        <p>재귀 한도(무한 루프 방지), 사람 승인(human-in-the-loop), 중단과 재개.</p></div>
+      <div class="card"><span class="tag">한 줄 결론</span><h3>LLM의 자율적 판단을<br>실행 가능하고 통제된 흐름으로</h3>
+        <p><strong>LLM이 두뇌라면 LangGraph는 그 판단을 몸으로 옮기는 신경계이자 골격</strong>입니다.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 10 ── 적용 순서 -->
+<section class="slide" data-ch="4">
+  <p class="eyebrow">적용 · 순서</p>
+  <h2 class="t">한 번에 다 만들지 <em class="l">않는다</em></h2>
+  <div class="body">
+    <div class="flow">
+      <div class="fx"><span class="st">STEP 01</span><h4>직선부터</h4><p>도구 없이 노드 하나로 LLM 호출만 돌려봅니다. 상태가 오가는지 확인.</p><span class="fig">chatbot 노드 1개</span></div>
+      <div class="ar">→</div>
+      <div class="fx"><span class="st">STEP 02</span><h4>도구 하나 + 루프</h4><p>도구를 딱 하나만 붙여 순환을 완성합니다. 여기까지가 에이전트입니다.</p><span class="fig">tools_condition</span></div>
+      <div class="ar">→</div>
+      <div class="fx"><span class="st">STEP 03</span><h4>상태 설계</h4><p>messages 외에 필요한 필드를 추가하고, 쌓을 것엔 리듀서를 붙입니다.</p><span class="fig">add_messages</span></div>
+      <div class="ar">→</div>
+      <div class="fx"><span class="st">STEP 04</span><h4>메모리</h4><p>체크포인터를 붙이고 thread_id로 사용자를 구분합니다.</p><span class="fig">checkpointer</span></div>
+      <div class="ar">→</div>
+      <div class="fx"><span class="st">STEP 05</span><h4>안전장치</h4><p>재귀 한도, 위험한 도구 앞의 사람 승인.</p><span class="fig">recursion_limit</span></div>
+    </div>
+    <div class="cols c2" style="margin-top:24px">
+      <div class="note loop" style="margin-top:0"><b>Step 2까지가 고비입니다.</b> 도구를 세 개씩 붙여 놓고 시작하면, 안 돌아갈 때 원인이 도구인지 라우팅인지 상태인지 구분할 수 없습니다.</div>
+      <div class="note" style="margin-top:0">각 단계마다 <b>그래프를 그려서 확인</b>하세요. 의도한 모양과 다르면 코드가 아니라 설계가 틀린 것입니다.</div>
+    </div>
+  </div>
+</section>
+
+<!-- 11 ── 사고 5가지 -->
+<section class="slide" data-ch="4">
+  <p class="eyebrow">주의 · 프로젝트에서 자주 나는 사고</p>
+  <h2 class="t">거의 <em class="l">이 다섯 가지</em>에서 막힌다</h2>
+  <div class="body">
+    <table class="tb sm">
+      <tr><th>증상</th><th>원인</th><th>해결</th></tr>
+      <tr><td><strong>무한 루프 · 재귀 한도 초과</strong></td><td>종료 조건이 없거나 라우터가 항상 계속을 반환</td><td class="vd">종료 경로를 먼저 만들고 테스트 · 루프 횟수 필드 추가</td></tr>
+      <tr><td><strong>LLM이 직전 대화를 모른다</strong></td><td>messages에 리듀서를 안 붙여 덮어쓰기 중</td><td class="vd">Annotated[list, add_messages]</td></tr>
+      <tr><td><strong>멀티턴이 안 된다</strong></td><td>checkpointer만 붙이고 thread_id를 안 넘김</td><td class="vd">invoke 호출마다 config 전달</td></tr>
+      <tr><td><strong>엉뚱한 노드로 간다</strong></td><td>라우터 반환값과 분기 지도의 이름표 불일치</td><td class="vd">문자열을 상수로 빼서 오타 차단</td></tr>
+      <tr><td><strong>도구를 안 쓰거나 잘못 고른다</strong></td><td>도구 설명(docstring)과 타입 힌트가 부실</td><td class="vd">그래프가 아니라 도구 정의를 고칠 것</td></tr>
+    </table>
+    <div class="note loop">마지막 줄이 중요합니다. <b>증상은 그래프에서 보이지만 원인이 LLM 쪽인 경우가 많습니다.</b> 7장의 역할 분담표로 어느 쪽 문제인지 먼저 가르세요.</div>
+  </div>
+</section>
+
+<!-- 12 ── 발표 -->
+<section class="slide" data-ch="4">
+  <p class="eyebrow">마무리 · 발표와 제출</p>
+  <h2 class="t">심사위원에게 <em>세 문장으로</em> 설명하기</h2>
+  <div class="body cols c2b" style="align-items:center">
+    <div>
+      <div class="card k-s"><span class="tag">설명 템플릿</span>
+        <p style="font-size:15.5px;line-height:1.7;color:var(--dim)">
+        ① 우리 프로젝트는 <strong>___를 위해</strong> 실행 중에 다음 단계를 스스로 정해야 했습니다.<br><br>
+        ② 흐름이 <strong>갈라지고 되돌아오기 때문에</strong> 직선 체인 대신 LangGraph로 구성했습니다.<br><br>
+        ③ 상태·메모리·재귀 한도로 <strong>자율성을 통제</strong>했습니다.</p></div>
+      <div class="note node">발표에서는 <b>그래프 그림 한 장</b>을 띄우세요. <span class="mn">draw_mermaid()</span> 출력이면 충분하고, 말로 하는 설명보다 훨씬 빠르게 전달됩니다.</div>
+    </div>
+    <div>
+      <div class="card"><span class="tag">한 줄 결론</span><h3 style="font-size:20px;line-height:1.45">LangGraph는 LLM의 자율적 판단을<br><span class="c-n">실행 가능하고 통제된 흐름</span>으로 바꾸는<br>실행·제어 엔진</h3></div>
+      <div class="chips" style="flex-direction:column;align-items:stretch;margin-top:16px">
+        <span class="chip"><b>판단</b>은 LLM — 무엇을 할지</span>
+        <span class="chip"><b>실행과 통제</b>는 LangGraph — 어떻게 돌릴지</span>
+        <span class="chip"><b>둘의 경계</b>가 디버깅의 첫 갈림길</span>
+      </div>
+      <div class="note" style="margin-top:16px">평가에서 가산점이 붙는 지점은 화려한 도구 개수가 아니라 <b>“왜 이 구조여야 했는가”에 답할 수 있는가</b>입니다.</div>
+    </div>
+  </div>
+</section>
+
+<nav id="rail" aria-label="진행 상황">
+  <ol>
+    <li data-ch="0" tabindex="0"><span class="dot"></span><span class="lb">도입</span></li>
+    <li data-ch="1" tabindex="0"><span class="dot"></span><span class="lb">판단</span></li>
+    <li data-ch="2" tabindex="0"><span class="dot"></span><span class="lb">순환</span></li>
+    <li data-ch="3" tabindex="0"><span class="dot"></span><span class="lb">역할</span></li>
+    <li data-ch="4" tabindex="0"><span class="dot"></span><span class="lb">적용</span></li>
+  </ol>
+  <svg class="arc" width="150" height="26" viewBox="0 0 150 26" aria-hidden="true">
+    <path d="M144 22 C 144 2, 8 2, 8 18" fill="none" stroke="#C56A82" stroke-width="1.2" stroke-dasharray="4 4" marker-end="url(#ah-l)"/>
+  </svg>
+</nav>
+
+<div id="hud">
+  <span id="count"><b>01</b> / <span id="tot">12</span></span>
+  <span class="nav"><button id="prev" aria-label="이전 슬라이드">‹</button><button id="next" aria-label="다음 슬라이드">›</button></span>
+</div>
+
+</div></div>
+
+<script>
+(function(){
+  var stage=document.getElementById('stage');
+  var slides=Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var railItems=Array.prototype.slice.call(document.querySelectorAll('#rail li'));
+  var cur=document.querySelector('#count b');
+  document.getElementById('tot').textContent=String(slides.length).padStart(2,'0');
+  var i=0, chapterStart={};
+  slides.forEach(function(s,k){ var c=s.dataset.ch; if(!(c in chapterStart)) chapterStart[c]=k; });
+
+  function go(n){
+    i=Math.max(0,Math.min(slides.length-1,n));
+    slides.forEach(function(s,k){ s.classList.toggle('is-active',k===i); });
+    cur.textContent=String(i+1).padStart(2,'0');
+    var ch=+slides[i].dataset.ch;
+    railItems.forEach(function(el,k){ el.classList.toggle('on',k===ch); el.classList.toggle('done',k<ch); });
+  }
+  function fit(){ stage.style.transform='scale('+Math.min(window.innerWidth/1280,window.innerHeight/720)+')'; }
+  window.addEventListener('resize',fit); fit();
+
+  document.addEventListener('keydown',function(e){
+    if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown'||e.key==='Enter'){e.preventDefault();go(i+1);}
+    else if(e.key==='ArrowLeft'||e.key==='PageUp'||e.key==='Backspace'){e.preventDefault();go(i-1);}
+    else if(e.key==='Home'){go(0);} else if(e.key==='End'){go(slides.length-1);}
+    else if(e.key==='f'||e.key==='F'){ document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen(); }
+  });
+  document.getElementById('next').addEventListener('click',function(){go(i+1);});
+  document.getElementById('prev').addEventListener('click',function(){go(i-1);});
+  railItems.forEach(function(el){
+    function jump(){ go(chapterStart[el.dataset.ch]); }
+    el.addEventListener('click',jump);
+    el.addEventListener('keydown',function(e){ if(e.key==='Enter'||e.key===' '){e.preventDefault();jump();} });
+  });
+  var x0=null;
+  stage.addEventListener('touchstart',function(e){x0=e.changedTouches[0].clientX;},{passive:true});
+  stage.addEventListener('touchend',function(e){
+    if(x0===null)return; var dx=e.changedTouches[0].clientX-x0;
+    if(Math.abs(dx)>50) go(dx<0?i+1:i-1); x0=null;
+  },{passive:true});
+
+  var RE=/(#[^\n]*)|("(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*')|\b(from|import|def|return|class|if|else|elif|for|while|lambda|True|False|None|in|not|and|or|print)\b|\b(\d+)\b|\b([A-Za-z_][A-Za-z0-9_]*)(?=\()/g;
+  function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  document.querySelectorAll('.code code').forEach(function(el){
+    var src=el.textContent,out='',last=0,m; RE.lastIndex=0;
+    while((m=RE.exec(src))!==null){
+      out+=esc(src.slice(last,m.index));
+      var cls=m[1]?'tk-c':m[2]?'tk-s':m[3]?'tk-k':m[4]?'tk-n':'tk-f';
+      out+='<span class="'+cls+'">'+esc(m[0])+'</span>';
+      last=m.index+m[0].length;
+    }
+    out+=esc(src.slice(last)); el.innerHTML=out;
+  });
+  go(0);
+})();
+</script>
+</body>
+</html>
