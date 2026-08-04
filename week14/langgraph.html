@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>14주차 · LangGraph — 직선이 아니라 순서도로</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#16130F; --ink-1:#1D1914; --ink-2:#26211A; --ink-3:#2F2921;
+  --line:#3B342B; --paper:#F2ECE2; --dim:#B9AF9D; --muted:#8E8474;
+  --state:#E3A33C;   /* State  — 공유 메모장 */
+  --node:#6FB6A9;    /* Node   — 담당자 */
+  --edge:#8E8474;    /* Edge   — 흐름선 */
+  --loop:#C56A82;    /* Loop   — 되돌아오는 길 */
+  --sans:'Pretendard Variable',Pretendard,-apple-system,'Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+  --mono:'JetBrains Mono','D2Coding',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--ink); color:var(--paper); font-family:var(--sans);
+  overflow:hidden; display:flex; align-items:center; justify-content:center;
+  -webkit-font-smoothing:antialiased;
+}
+#viewport{width:100%;height:100%;display:flex;align-items:center;justify-content:center}
+
+/* ---------- 16:9 무대 ---------- */
+#stage{
+  position:relative; width:1280px; height:720px; flex:none;
+  transform-origin:center center; background:var(--ink);
+  background-image:
+    radial-gradient(900px 480px at 12% -10%, rgba(227,163,60,.09), transparent 62%),
+    radial-gradient(700px 420px at 96% 108%, rgba(111,182,169,.07), transparent 60%),
+    radial-gradient(circle at 1px 1px, rgba(242,236,226,.055) 1px, transparent 0);
+  background-size:auto,auto,32px 32px;
+  overflow:hidden;
+}
+.slide{
+  position:absolute; inset:0; padding:52px 68px 92px;
+  display:flex; flex-direction:column; opacity:0; visibility:hidden;
+  transform:translateY(10px); transition:opacity .32s ease, transform .32s ease;
+}
+.slide.is-active{opacity:1;visibility:visible;transform:none}
+
+/* ---------- 타이포 ---------- */
+.eyebrow{
+  font-family:var(--mono); font-size:12.5px; font-weight:500; letter-spacing:.16em;
+  text-transform:uppercase; color:var(--state); display:flex; align-items:center; gap:10px;
+}
+.eyebrow::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--line),transparent)}
+h2.t{font-size:38px;font-weight:800;letter-spacing:-.02em;line-height:1.2;margin:14px 0 6px}
+h2.t em{font-style:normal;color:var(--state)}
+.lede{font-size:17px;color:var(--dim);line-height:1.6;max-width:960px}
+.body{margin-top:auto;margin-bottom:auto}
+p,li{font-size:17px;line-height:1.62}
+strong{font-weight:700;color:#fff}
+.km{font-family:var(--mono);font-size:.94em;color:var(--node)}
+.ks{color:var(--state);font-weight:700}
+
+/* ---------- 표지 ---------- */
+.s-cover{padding:0}
+.cover{display:grid;grid-template-columns:1.02fr .98fr;height:100%;align-items:center;gap:24px;padding:0 68px 72px}
+.cover-title{font-size:60px;font-weight:800;letter-spacing:-.035em;line-height:1.12;margin:18px 0 20px}
+.cover-title em{font-style:normal;color:var(--state)}
+.cover-sub{font-size:18px;color:var(--dim);line-height:1.65;max-width:440px}
+.cover-meta{list-style:none;display:flex;gap:8px;flex-wrap:wrap;margin-top:34px}
+.cover-meta li{
+  font-family:var(--mono);font-size:12px;color:var(--dim);border:1px solid var(--line);
+  border-radius:999px;padding:7px 13px;background:rgba(242,236,226,.02)
+}
+
+/* ---------- 카드 · 패널 ---------- */
+.cols{display:grid;gap:26px}
+.c2{grid-template-columns:1fr 1fr}
+.c2a{grid-template-columns:1.06fr .94fr}
+.c2b{grid-template-columns:.92fr 1.08fr}
+.c3{grid-template-columns:repeat(3,1fr)}
+.card{
+  background:var(--ink-1);border:1px solid var(--line);border-radius:14px;padding:22px 22px 20px;
+  position:relative;overflow:hidden
+}
+.card h3{font-size:19px;font-weight:700;margin-bottom:8px;letter-spacing:-.01em}
+.card p{font-size:15.5px;color:var(--dim);line-height:1.6}
+.card .tag{font-family:var(--mono);font-size:11px;letter-spacing:.12em;color:var(--muted);display:block;margin-bottom:12px}
+.card.k-state{border-top:2px solid var(--state)}
+.card.k-node{border-top:2px solid var(--node)}
+.card.k-loop{border-top:2px solid var(--loop)}
+
+/* 학습목표 */
+.goals{list-style:none;display:grid;grid-template-columns:1fr 1fr;gap:14px 30px;margin-top:26px}
+.goals li{display:flex;gap:16px;align-items:flex-start;padding:14px 0;border-top:1px solid var(--line)}
+.goals .n{font-family:var(--mono);font-size:13px;color:var(--state);padding-top:3px;flex:none}
+.goals .g{font-size:16.5px;line-height:1.55}
+.goals .g span{display:block;font-size:13.5px;color:var(--muted);margin-top:4px;font-family:var(--mono)}
+
+/* 칩 */
+.chips{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+.chip{
+  font-size:14px;color:var(--dim);border:1px solid var(--line);border-radius:10px;
+  padding:10px 14px;background:var(--ink-1);line-height:1.45
+}
+.chip b{color:var(--paper);font-weight:700}
+
+/* 콜아웃 */
+.note{
+  margin-top:18px;border-left:2px solid var(--state);background:rgba(227,163,60,.06);
+  padding:14px 18px;border-radius:0 10px 10px 0;font-size:15.5px;color:var(--dim);line-height:1.6
+}
+.note.warn{border-left-color:var(--loop);background:rgba(197,106,130,.07)}
+.note b{color:var(--paper)}
+
+/* ---------- 코드 ---------- */
+.code{
+  background:#120F0B;border:1px solid var(--line);border-radius:14px;overflow:hidden;
+  display:flex;flex-direction:column
+}
+.code .bar{
+  display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid var(--line);
+  font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:var(--muted);background:rgba(242,236,226,.02)
+}
+.code .bar i{width:7px;height:7px;border-radius:50%;background:var(--line);display:block}
+.code pre{padding:16px 18px;overflow:hidden}
+.code code{font-family:var(--mono);font-size:14.2px;line-height:1.72;color:#DCD4C6;white-space:pre;display:block}
+.code.sm code{font-size:13.2px;line-height:1.66}
+.code.xs code{font-size:12.4px;line-height:1.58}
+.tk-c{color:#6E6558;font-style:italic}
+.tk-s{color:#D9A05B}
+.tk-k{color:#C56A82}
+.tk-n{color:#8FBF9B}
+.tk-f{color:#6FB6A9}
+
+/* ---------- 다이어그램 ---------- */
+.dg{display:block;margin:0 auto}
+.dg text{font-family:var(--sans)}
+.dg .nd{fill:var(--ink-2);stroke:var(--node);stroke-width:1.5}
+.dg .nd-dim{fill:var(--ink-1);stroke:var(--line)}
+.dg .nt{fill:var(--paper);font-family:var(--mono);font-size:14px;font-weight:500;text-anchor:middle}
+.dg .nt-k{fill:var(--paper);font-size:14.5px;font-weight:600;text-anchor:middle}
+.dg .term{fill:none;stroke:var(--line)}
+.dg .term-t{fill:var(--muted);font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.1em;text-anchor:middle}
+.dg .e{stroke:var(--edge);stroke-width:1.7;fill:none;marker-end:url(#ah-edge)}
+.dg .e-c{stroke:var(--node);stroke-width:1.7;fill:none;stroke-dasharray:6 5;marker-end:url(#ah-node)}
+.dg .e-l{stroke:var(--loop);stroke-width:1.7;fill:none;marker-end:url(#ah-loop)}
+.dg .e-s{stroke:var(--state);stroke-width:1.4;fill:none;stroke-dasharray:2 4;opacity:.8}
+.dg .lbl{fill:var(--muted);font-family:var(--mono);font-size:12px;text-anchor:middle}
+.dg .lbl-c{fill:var(--node);font-size:12.5px;font-weight:600;text-anchor:middle}
+.dg .lbl-l{fill:var(--loop);font-family:var(--mono);font-size:12px;text-anchor:middle}
+.dg .val{fill:var(--state);font-family:var(--mono);font-size:13.5px;font-weight:700;text-anchor:middle}
+.dg .sbox{fill:rgba(227,163,60,.06);stroke:var(--state);stroke-width:1.3;stroke-dasharray:5 4}
+.dg .st{fill:var(--state);font-size:14px;font-weight:700}
+.dg .sm{fill:var(--dim);font-family:var(--mono);font-size:12.5px}
+.dg .rt{fill:var(--node);font-family:var(--mono);font-size:13px;font-weight:600;text-anchor:middle}
+.flow{stroke-dasharray:7 9;animation:dash 3.4s linear infinite}
+@keyframes dash{to{stroke-dashoffset:-64}}
+
+/* 레전드 */
+.legend{list-style:none;display:flex;flex-direction:column;gap:13px}
+.legend li{display:flex;gap:12px;align-items:flex-start;font-size:14.5px;color:var(--dim);line-height:1.5}
+.legend .sw{width:26px;height:3px;border-radius:2px;margin-top:9px;flex:none}
+.sw-state{background:var(--state)}
+.sw-node{background:var(--node)}
+.sw-edge{background:var(--edge)}
+.sw-loop{background:var(--loop)}
+.legend b{color:var(--paper);display:block;font-size:15px;margin-bottom:2px}
+
+/* 덮어쓰기 vs 이어붙이기 */
+.lanes{display:flex;flex-direction:column;gap:16px;margin-top:6px}
+.lane{border:1px solid var(--line);border-radius:14px;padding:16px 20px;background:var(--ink-1)}
+.lane.bad{border-left:3px solid var(--loop)}
+.lane.good{border-left:3px solid var(--state)}
+.lane .hd{display:flex;align-items:baseline;gap:12px;margin-bottom:14px}
+.lane .hd h3{font-size:17px;font-weight:700}
+.lane .hd code{font-family:var(--mono);font-size:12.5px;color:var(--muted)}
+.flowrow{display:flex;align-items:center;gap:14px;flex-wrap:nowrap}
+.step{border:1px solid var(--line);border-radius:10px;padding:9px 14px;background:var(--ink-2);text-align:center;flex:none}
+.step .who{font-family:var(--mono);font-size:11px;color:var(--muted);display:block;margin-bottom:3px}
+.step .vv{font-family:var(--mono);font-size:13.5px;color:var(--paper)}
+.arrw{color:var(--edge);font-size:17px;flex:none}
+.step.res{border-color:var(--state);background:rgba(227,163,60,.08)}
+.step.res .vv{color:var(--state);font-weight:700}
+.step.res.x{border-color:var(--loop);background:rgba(197,106,130,.08)}
+.step.res.x .vv{color:var(--loop)}
+.gone{color:var(--muted);text-decoration:line-through}
+.verdict{margin-left:auto;font-size:14px;color:var(--muted);text-align:right;line-height:1.45;flex:none;max-width:250px}
+
+/* 표 */
+table.sum{width:100%;border-collapse:collapse;margin-top:20px}
+table.sum th,table.sum td{text-align:left;padding:13px 14px;border-bottom:1px solid var(--line);font-size:16px;vertical-align:top}
+table.sum th{font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;font-weight:500;border-bottom-color:var(--line)}
+table.sum td:first-child{width:210px;font-weight:700}
+table.sum td:first-child i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:10px;vertical-align:middle}
+table.sum td:nth-child(2){color:var(--dim)}
+table.sum td code{font-family:var(--mono);font-size:13.5px;color:var(--node)}
+.d-state{background:var(--state)}.d-node{background:var(--node)}.d-edge{background:var(--edge)}.d-loop{background:var(--loop)}
+
+/* 노트북 매핑 */
+.parts{list-style:none;display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:24px}
+.parts li{border:1px solid var(--line);border-radius:12px;padding:15px 16px;background:var(--ink-1)}
+.parts .p{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;color:var(--state);display:block;margin-bottom:7px}
+.parts .n{font-size:15.5px;font-weight:600;line-height:1.4}
+.parts .k{font-size:13px;color:var(--muted);font-family:var(--mono);margin-top:5px;display:block}
+
+/* ---------- 하단 레일(진행 그래프) ---------- */
+#rail{position:absolute;left:68px;right:68px;bottom:30px;height:42px}
+#rail ol{list-style:none;display:flex;justify-content:space-between;position:relative;padding-top:6px}
+#rail::before{content:'';position:absolute;left:14px;right:120px;top:11px;height:1px;background:var(--line)}
+#rail li{position:relative;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;z-index:2}
+#rail .dot{width:9px;height:9px;border-radius:50%;background:var(--ink);border:1.5px solid var(--line);transition:.25s}
+#rail .lb{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;color:var(--muted);transition:.25s}
+#rail li.done .dot{background:var(--edge);border-color:var(--edge)}
+#rail li.on .dot{background:var(--state);border-color:var(--state);box-shadow:0 0 0 4px rgba(227,163,60,.16)}
+#rail li.on .lb{color:var(--state)}
+#rail li:hover .lb{color:var(--dim)}
+#rail .arc{position:absolute;right:76px;top:-14px;pointer-events:none;opacity:.55}
+
+#hud{position:absolute;right:68px;bottom:34px;display:flex;align-items:center;gap:14px;font-family:var(--mono);font-size:12px;color:var(--muted)}
+#hud .nav{display:flex;gap:6px}
+#hud button{
+  width:26px;height:26px;border-radius:7px;border:1px solid var(--line);background:transparent;
+  color:var(--dim);font-size:13px;cursor:pointer;line-height:1;font-family:var(--mono)
+}
+#hud button:hover{border-color:var(--edge);color:var(--paper)}
+#hud button:focus-visible,#rail li:focus-visible{outline:2px solid var(--state);outline-offset:3px}
+#count b{color:var(--paper);font-weight:700}
+
+@media (prefers-reduced-motion:reduce){
+  .slide{transition:none} .flow{animation:none}
+}
+@media print{
+  body,#viewport{display:block;overflow:visible;height:auto}
+  #stage{transform:none!important;width:1280px;height:auto}
+  .slide{position:relative;inset:auto;opacity:1;visibility:visible;transform:none;height:720px;page-break-after:always}
+  @page{size:1280px 720px;margin:0}
+}
+</style>
+</head>
+<body>
+
+<!-- 화살표 마커(문서 전역 공유) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <marker id="ah-edge" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8E8474"/></marker>
+  <marker id="ah-node" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6FB6A9"/></marker>
+  <marker id="ah-loop" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#C56A82"/></marker>
+  <marker id="ah-state" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#E3A33C"/></marker>
+</defs></svg>
+
+<div id="viewport">
+<div id="stage">
+
+<!-- 1 ─────────────────────────────── 표지 -->
+<section class="slide s-cover is-active" data-ch="0">
+  <div class="cover">
+    <div>
+      <p class="eyebrow">14주차 · LangGraph</p>
+      <h1 class="cover-title">직선이 아니라<br><em>순서도</em>로 생각하기</h1>
+      <p class="cover-sub">State · Node · Edge — 갈림길과 반복이 있는 흐름을 코드로 만드는 법. 오늘 만든 그래프가 다음 주 에이전트의 뼈대가 됩니다.</p>
+      <ul class="cover-meta">
+        <li>LLM 없이 순수 파이썬</li><li>API 키 없이 실습 가능</li><li>실습 노트북 Part 1–7</li>
+      </ul>
+    </div>
+    <div>
+      <svg class="dg" width="520" height="360" viewBox="0 0 520 360" role="img" aria-label="갈림길과 반복이 있는 그래프">
+        <rect class="sbox" x="30" y="16" width="460" height="56" rx="12"/>
+        <text class="st" x="52" y="42">State</text>
+        <text class="sm" x="52" y="61">모든 노드가 함께 보는 메모장</text>
+        <text class="sm" x="392" y="52" style="fill:#E3A33C">{ … }</text>
+
+        <rect class="term" x="220" y="102" width="80" height="30" rx="15"/>
+        <text class="term-t" x="260" y="122">START</text>
+        <path class="e flow" d="M260 132 L260 164"/>
+
+        <rect class="nd" x="180" y="172" width="160" height="54" rx="12"/>
+        <text class="nt-k" x="260" y="205">노드 A</text>
+        <path class="e-s" d="M180 199 L96 199 L96 72" marker-end="url(#ah-state)"/>
+
+        <path class="e flow" d="M260 226 L260 258"/>
+        <rect class="nd" x="180" y="266" width="160" height="54" rx="12"/>
+        <text class="nt-k" x="260" y="299">노드 B</text>
+
+        <path class="e-l" d="M340 293 C 420 293, 420 199, 348 199"/>
+        <text class="lbl-l" x="425" y="250">반복</text>
+
+        <path class="e-c" d="M180 293 L112 293 Q75 293 75 302"/>
+        <text class="lbl-c" x="128" y="282">갈림길</text>
+        <rect class="nd" x="10" y="308" width="130" height="46" rx="11"/>
+        <text class="nt-k" x="75" y="337" style="font-size:13.5px">노드 C</text>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- 2 ─────────────────────────────── 학습목표 -->
+<section class="slide" data-ch="0">
+  <p class="eyebrow">학습목표</p>
+  <h2 class="t">오늘 끝나면 이걸 할 수 있습니다</h2>
+  <div class="body">
+    <ul class="goals">
+      <li><span class="n">01</span><span class="g">LangGraph가 무엇이고 왜 “그래프”로 생각하는지 설명한다<span>왜 직선으로는 부족한가</span></span></li>
+      <li><span class="n">02</span><span class="g">State · Node · Edge를 이해하고 노드 1개짜리 그래프를 만든다<span>StateGraph / add_node / add_edge / compile</span></span></li>
+      <li><span class="n">03</span><span class="g">노드를 여러 개 이어 순서대로 흐르는 그래프를 만든다<span>상태가 노드를 지나며 바뀐다</span></span></li>
+      <li><span class="n">04</span><span class="g">덮어쓰기와 이어붙이기(Reducer)의 차이를 쓴다<span>Annotated[list, operator.add]</span></span></li>
+      <li><span class="n">05</span><span class="g">조건 분기(갈림길)와 반복(루프)이 있는 그래프를 만든다<span>add_conditional_edges</span></span></li>
+    </ul>
+    <div class="note"><b>이번 주는 LangGraph 자체를 손에 익히는 시간입니다.</b> 대부분의 예제는 LLM 없이 순수 파이썬으로 돌아갑니다. 다음 주에는 이 기본기 위에 에이전트를 올립니다.</div>
+  </div>
+</section>
+
+<!-- 3 ─────────────────────────────── 직선 vs 그래프 -->
+<section class="slide" data-ch="0">
+  <p class="eyebrow">왜 그래프인가 · 1</p>
+  <h2 class="t">지금까지의 RAG는 <em>한 방향 직선</em>이었다</h2>
+  <div class="body cols c2">
+    <div>
+      <svg class="dg" width="520" height="230" viewBox="0 0 520 230" role="img" aria-label="직선 파이프라인">
+        <text class="lbl" x="60" y="24" style="text-anchor:start;fill:#8E8474">LCEL · 파이프</text>
+        <rect class="nd nd-dim" x="20" y="88" width="104" height="48" rx="11"/><text class="nt" x="72" y="118">입력</text>
+        <path class="e" d="M124 112 L152 112"/>
+        <rect class="nd nd-dim" x="160" y="88" width="104" height="48" rx="11"/><text class="nt" x="212" y="118">검색</text>
+        <path class="e" d="M264 112 L292 112"/>
+        <rect class="nd nd-dim" x="300" y="88" width="104" height="48" rx="11"/><text class="nt" x="352" y="118">LLM</text>
+        <path class="e" d="M404 112 L432 112"/>
+        <rect class="nd nd-dim" x="440" y="88" width="66" height="48" rx="11"/><text class="nt" x="473" y="118">출력</text>
+        <text class="lbl" x="260" y="184">갈림길도, 되돌아옴도 없다</text>
+      </svg>
+      <div class="chip" style="margin-top:6px">간단한 흐름에는 <b>충분합니다.</b> 다만 “상황을 보고 판단”하거나 “될 때까지 되풀이”할 수 없습니다.</div>
+    </div>
+    <div>
+      <svg class="dg" width="480" height="230" viewBox="0 0 480 230" role="img" aria-label="그래프 흐름">
+        <text class="lbl" x="24" y="24" style="text-anchor:start;fill:#E3A33C">LangGraph · 순서도</text>
+        <rect class="nd" x="60" y="52" width="130" height="48" rx="11"/><text class="nt-k" x="125" y="82">노드 A</text>
+        <path class="e" d="M190 76 L246 76"/>
+        <rect class="nd" x="254" y="52" width="130" height="48" rx="11"/><text class="nt-k" x="319" y="82">노드 B</text>
+        <path class="e-l" d="M384 76 C 440 76, 440 34, 250 34 L 128 34 L 128 44" marker-end="url(#ah-loop)"/>
+        <text class="lbl-l" x="256" y="24">되돌아오기</text>
+        <path class="e-c" d="M319 100 L319 140"/>
+        <rect class="nd" x="254" y="148" width="130" height="48" rx="11"/><text class="nt-k" x="319" y="178">노드 C</text>
+        <text class="lbl-c" x="360" y="128">갈림길</text>
+      </svg>
+      <div class="chip" style="margin-top:6px"><b>갈림길 · 반복 · 상태 공유</b>를 그대로 코드로 옮길 수 있습니다.</div>
+    </div>
+  </div>
+</section>
+
+<!-- 4 ─────────────────────────────── 필요해진 3가지 -->
+<section class="slide" data-ch="0">
+  <p class="eyebrow">왜 그래프인가 · 2</p>
+  <h2 class="t">직선이 감당 못 하는 <em>세 가지</em></h2>
+  <div class="body">
+    <div class="cols c3">
+      <div class="card k-node"><span class="tag">BRANCH</span><h3>갈림길</h3><p>상황에 따라 다른 길로 갑니다. 짝수면 A, 홀수면 B. 에이전트라면 “도구를 쓸까, 그냥 답할까”.</p></div>
+      <div class="card k-loop"><span class="tag">LOOP</span><h3>반복</h3><p>조건이 될 때까지 같은 일을 되풀이합니다. 도구 결과를 보고 다시 생각하는 것도 반복입니다.</p></div>
+      <div class="card k-state"><span class="tag">STATE</span><h3>기억</h3><p>여러 단계가 데이터를 공유하며 조금씩 바꿔갑니다. 대화 기록도 결국 공유되는 상태입니다.</p></div>
+    </div>
+    <div class="note">다음 주 <b>에이전트</b>는 “생각 → 도구 필요? → 도구 실행 → 다시 생각”으로 움직입니다. 세 가지가 전부 필요하죠. 그래서 그래프입니다.</div>
+  </div>
+</section>
+
+<!-- 5 ─────────────────────────────── 3가지 개념 -->
+<section class="slide" data-ch="1">
+  <p class="eyebrow">개념 · State · Node · Edge</p>
+  <h2 class="t">그래프의 해부도</h2>
+  <div class="body cols c2a" style="align-items:center">
+    <div>
+      <svg class="dg" width="600" height="300" viewBox="0 0 600 300" role="img" aria-label="State, Node, Edge 구조">
+        <rect class="sbox" x="20" y="18" width="560" height="72" rx="14"/>
+        <text class="st" x="44" y="48">State — 공유 메모장</text>
+        <text class="sm" x="44" y="70">모든 노드가 이걸 보고, 결과를 여기에 적는다</text>
+        <text class="sm" x="470" y="60" style="fill:#E3A33C">text: str</text>
+
+        <rect class="term" x="20" y="212" width="76" height="34" rx="17"/><text class="term-t" x="58" y="234">START</text>
+        <path class="e" d="M104 229 L152 229"/>
+        <rect class="nd" x="160" y="200" width="150" height="58" rx="13"/><text class="nt-k" x="235" y="235">노드 A</text>
+        <path class="e" d="M318 229 L366 229"/>
+        <rect class="nd" x="374" y="200" width="150" height="58" rx="13"/><text class="nt-k" x="449" y="235">노드 B</text>
+        <path class="e" d="M532 229 L556 229"/>
+        <rect class="term" x="536" y="212" width="46" height="34" rx="17" style="stroke:none;fill:none"/>
+        <text class="term-t" x="566" y="234">END</text>
+
+        <path class="e-s" d="M235 200 L235 90" marker-end="url(#ah-state)" marker-start="url(#ah-state)"/>
+        <path class="e-s" d="M449 200 L449 90" marker-end="url(#ah-state)" marker-start="url(#ah-state)"/>
+        <text class="lbl" x="300" y="150" style="fill:#E3A33C">읽고 · 쓰고</text>
+      </svg>
+    </div>
+    <ul class="legend">
+      <li><span class="sw sw-state"></span><span><b>State — 상태</b>그래프가 들고 다니는 공유 데이터. 📋 모두가 함께 보는 메모장.</span></li>
+      <li><span class="sw sw-node"></span><span><b>Node — 노드</b>상태를 읽고 바꾸는 함수. 🧑‍💼 일하는 담당자.</span></li>
+      <li><span class="sw sw-edge"></span><span><b>Edge — 엣지</b>노드에서 노드로 가는 화살표. ➡️ 흐름선.</span></li>
+      <li><span class="sw sw-loop"></span><span><b>되돌아오는 길</b>같은 노드로 다시 향하는 엣지. 이것이 반복입니다.</span></li>
+    </ul>
+  </div>
+  <div class="note" style="margin-top:0">딱 이 셋입니다. 오늘 나머지 시간은 <b>이 셋을 어떻게 조합하느냐</b>의 이야기입니다.</div>
+</section>
+
+<!-- 6 ─────────────────────────────── 첫 그래프 -->
+<section class="slide" data-ch="2">
+  <p class="eyebrow">실습 · 노드 1개</p>
+  <h2 class="t">첫 그래프 — 대문자로 외치기</h2>
+  <div class="body cols c2b" style="align-items:start">
+    <div>
+      <svg class="dg" width="440" height="150" viewBox="0 0 440 150" role="img" aria-label="노드 하나짜리 그래프">
+        <rect class="term" x="10" y="60" width="76" height="34" rx="17"/><text class="term-t" x="48" y="82">START</text>
+        <path class="e" d="M94 77 L138 77"/>
+        <rect class="nd" x="146" y="48" width="150" height="58" rx="13"/><text class="nt" x="221" y="83">shout</text>
+        <path class="e" d="M304 77 L352 77"/>
+        <text class="term-t" x="382" y="82">END</text>
+        <text class="val" x="110" y="34">"hello"</text>
+        <text class="val" x="330" y="34">"HELLO!"</text>
+        <text class="lbl" x="221" y="132">대문자로 바꾸고 ! 붙이기</text>
+      </svg>
+      <div class="chips">
+        <span class="chip"><b>State는 “모양”</b> — TypedDict로 어떤 값을 들고 다닐지 정의</span>
+        <span class="chip"><b>Node는 그냥 함수</b> — 바뀔 부분만 dict로 반환</span>
+        <span class="chip"><b>조립은 세 줄</b> — add_node → add_edge → compile</span>
+      </div>
+      <p class="lbl" style="margin-top:14px;font-family:var(--mono);color:var(--muted);font-size:12.5px">📒 실습 노트북 Part 1</p>
+    </div>
+    <div class="code">
+      <div class="bar"><i></i>graph_01_single_node.py</div>
+      <pre><code>from typing_extensions import TypedDict
+from langgraph.graph import StateGraph, START, END
+
+# ① State — 그래프가 들고 다닐 메모장의 모양
+class State(TypedDict):
+    text: str
+
+# ② Node — 상태를 받아 '바뀔 부분만' 반환
+def shout(state: State):
+    return {"text": state["text"].upper() + "!"}
+
+# ③ 조립
+builder = StateGraph(State)
+builder.add_node("shout", shout)     # 담당자 등록
+builder.add_edge(START, "shout")     # 시작 → shout
+builder.add_edge("shout", END)       # shout → 끝
+graph = builder.compile()
+
+graph.invoke({"text": "hello"})      # {'text': 'HELLO!'}</code></pre>
+    </div>
+  </div>
+</section>
+
+<!-- 7 ─────────────────────────────── 순차 -->
+<section class="slide" data-ch="2">
+  <p class="eyebrow">실습 · 노드 여러 개</p>
+  <h2 class="t">상태가 노드를 지나며 <em>조금씩 바뀐다</em></h2>
+  <div class="body cols c2b" style="align-items:start">
+    <div>
+      <svg class="dg" width="460" height="160" viewBox="0 0 460 160" role="img" aria-label="순차 실행 그래프">
+        <rect class="term" x="0" y="66" width="72" height="34" rx="17"/><text class="term-t" x="36" y="88">START</text>
+        <path class="e" d="M80 83 L112 83"/>
+        <rect class="nd" x="120" y="54" width="140" height="58" rx="13"/><text class="nt" x="190" y="89">add_one</text>
+        <path class="e" d="M268 83 L300 83"/>
+        <rect class="nd" x="308" y="54" width="112" height="58" rx="13"/><text class="nt" x="364" y="89">double</text>
+        <path class="e" d="M428 83 L448 83"/>
+        <text class="val" x="96" y="42">3</text>
+        <text class="val" x="284" y="42">4</text>
+        <text class="val" x="440" y="42">8</text>
+        <text class="lbl" x="190" y="140">number + 1</text>
+        <text class="lbl" x="364" y="140">number × 2</text>
+      </svg>
+      <div class="note" style="margin-top:20px">상태 <span class="km">number</span>가 노드를 거치며 <span class="ks">3 → 4 → 8</span>로 흘러갑니다. <b>여러 단계 작업을 노드로 쪼개</b> 순서대로 잇는 것이 그래프의 기본입니다.</div>
+      <p style="margin-top:14px;font-family:var(--mono);color:var(--muted);font-size:12.5px">📒 실습 노트북 Part 2</p>
+    </div>
+    <div class="code">
+      <div class="bar"><i></i>graph_02_sequence.py</div>
+      <pre><code>class State(TypedDict):
+    number: int
+
+def add_one(state): return {"number": state["number"] + 1}
+def double(state):  return {"number": state["number"] * 2}
+
+builder = StateGraph(State)
+builder.add_node("add_one", add_one)
+builder.add_node("double", double)
+
+builder.add_edge(START, "add_one")
+builder.add_edge("add_one", "double")   # 이 순서로 흐른다
+builder.add_edge("double", END)
+graph = builder.compile()
+
+graph.invoke({"number": 3})   # {'number': 8}</code></pre>
+    </div>
+  </div>
+</section>
+
+<!-- 8 ─────────────────────────────── 덮어쓰기 vs 이어붙이기 -->
+<section class="slide" data-ch="3">
+  <p class="eyebrow">State 자세히 · Reducer</p>
+  <h2 class="t">덮어쓰기 vs <em>이어붙이기</em></h2>
+  <p class="lede">노드가 어떤 값을 반환하면 기본적으로 <strong>그 값으로 바꿔치기</strong> 합니다. 그래서 여러 노드가 같은 필드를 건드리면 마지막 값만 남습니다.</p>
+  <div class="body">
+    <div class="lanes">
+      <div class="lane bad">
+        <div class="hd"><h3>덮어쓰기 — 기본값</h3><code>steps: list</code></div>
+        <div class="flowrow">
+          <div class="step"><span class="who">node_a</span><span class="vv">["A 실행"]</span></div>
+          <span class="arrw">→</span>
+          <div class="step"><span class="who">node_b</span><span class="vv">["B 실행"]</span></div>
+          <span class="arrw">→</span>
+          <div class="step res x"><span class="who">결과</span><span class="vv"><span class="gone">"A 실행"</span> ["B 실행"]</span></div>
+          <div class="verdict">앞의 값이 사라집니다. 기록을 쌓아야 하는 곳에선 치명적이죠.</div>
+        </div>
+      </div>
+      <div class="lane good">
+        <div class="hd"><h3>이어붙이기 — Reducer를 붙였을 때</h3><code>steps: Annotated[list, operator.add]</code></div>
+        <div class="flowrow">
+          <div class="step"><span class="who">node_a</span><span class="vv">["A 실행"]</span></div>
+          <span class="arrw">→</span>
+          <div class="step"><span class="who">node_b</span><span class="vv">["B 실행"]</span></div>
+          <span class="arrw">→</span>
+          <div class="step res"><span class="who">결과</span><span class="vv">["A 실행", "B 실행"]</span></div>
+          <div class="verdict">리스트끼리 더해져 쌓입니다. 한 줄 차이입니다.</div>
+        </div>
+      </div>
+    </div>
+    <div class="note"><b>Reducer</b>는 “같은 필드에 새 값이 오면 어떻게 합칠지” 정하는 규칙입니다. 규칙이 없으면 덮어쓰고, <span class="km">operator.add</span>를 붙이면 이어붙입니다.</div>
+  </div>
+</section>
+
+<!-- 9 ─────────────────────────────── Reducer 코드 -->
+<section class="slide" data-ch="3">
+  <p class="eyebrow">State 자세히 · 코드</p>
+  <h2 class="t">한 줄로 규칙을 바꾼다</h2>
+  <div class="body cols c2a" style="align-items:start">
+    <div class="code">
+      <div class="bar"><i></i>graph_03_reducer.py</div>
+      <pre><code>import operator
+from typing import Annotated
+
+class State(TypedDict):
+    steps: Annotated[list, operator.add]   # ← "이어붙여라"
+
+def node_a(state): return {"steps": ["A 실행"]}
+def node_b(state): return {"steps": ["B 실행"]}
+
+# A → B 순서로 실행하면 둘 다 쌓인다
+# {'steps': ['A 실행', 'B 실행']}</code></pre>
+    </div>
+    <div>
+      <div class="card k-state">
+        <span class="tag">다음 주 예고</span>
+        <h3>add_messages도 Reducer입니다</h3>
+        <p>15주차에서 대화 기록을 담을 때 쓰는 <span class="km">add_messages</span>는 “메시지를 덮어쓰지 말고 이어붙여라”는 규칙, 즉 <strong>메시지 전용 Reducer</strong>입니다. 지금 원리를 이해하면 다음 주가 쉬워집니다.</p>
+      </div>
+      <div class="chips">
+        <span class="chip">규칙 없음 → <b>덮어쓰기</b></span>
+        <span class="chip"><span class="km">operator.add</span> → <b>이어붙이기</b></span>
+        <span class="chip"><span class="km">add_messages</span> → <b>메시지 이어붙이기</b></span>
+      </div>
+      <p style="margin-top:16px;font-family:var(--mono);color:var(--muted);font-size:12.5px">📒 실습 노트북 Part 3</p>
+    </div>
+  </div>
+</section>
+
+<!-- 10 ─────────────────────────────── 조건 분기 -->
+<section class="slide" data-ch="4">
+  <p class="eyebrow">갈림길 · Conditional Edges</p>
+  <h2 class="t">상황을 보고 <em>다른 길로</em></h2>
+  <div class="body cols c2b" style="align-items:start">
+    <div>
+      <svg class="dg" width="450" height="210" viewBox="0 0 450 210" role="img" aria-label="조건 분기 그래프">
+        <rect class="term" x="0" y="88" width="72" height="34" rx="17"/><text class="term-t" x="36" y="110">START</text>
+        <path class="e" d="M80 105 L112 105"/>
+        <g><path d="M120 105 L164 76 L208 105 L164 134 Z" fill="rgba(111,182,169,.08)" stroke="#6FB6A9" stroke-width="1.5"/>
+        <text class="rt" x="164" y="110">route</text></g>
+        <path class="e-c" d="M208 92 C 240 92, 244 44, 272 44"/>
+        <text class="lbl-c" x="242" y="34">짝수</text>
+        <rect class="nd" x="280" y="18" width="150" height="52" rx="12"/><text class="nt" x="355" y="50">even_node</text>
+        <path class="e-c" d="M208 118 C 240 118, 244 166, 272 166"/>
+        <text class="lbl-c" x="242" y="192">홀수</text>
+        <rect class="nd" x="280" y="140" width="150" height="52" rx="12"/><text class="nt" x="355" y="172">odd_node</text>
+        <text class="lbl" x="164" y="164">number % 2</text>
+      </svg>
+      <div class="chips">
+        <span class="chip"><b>route</b> — 상태를 보고 표지판 이름을 반환</span>
+        <span class="chip"><b>지도</b> — 이름표를 실제 노드로 연결</span>
+      </div>
+      <p style="margin-top:14px;font-family:var(--mono);color:var(--muted);font-size:12.5px">📒 실습 노트북 Part 4</p>
+    </div>
+    <div class="code sm">
+      <div class="bar"><i></i>graph_04_branch.py</div>
+      <pre><code>class State(TypedDict):
+    number: int
+    result: str
+
+def even_node(state): return {"result": "짝수입니다"}
+def odd_node(state):  return {"result": "홀수입니다"}
+
+# 라우터 — 어디로 갈지 '이름표'를 반환
+def route(state):
+    return "even" if state["number"] % 2 == 0 else "odd"
+
+builder.add_conditional_edges(
+    START, route,
+    {"even": "even_node", "odd": "odd_node"}   # 이름표 → 노드
+)
+
+graph.invoke({"number": 4})   # 짝수입니다
+graph.invoke({"number": 7})   # 홀수입니다</code></pre>
+    </div>
+  </div>
+</section>
+
+<!-- 11 ─────────────────────────────── 루프 -->
+<section class="slide" data-ch="5">
+  <p class="eyebrow">반복 · Loop</p>
+  <h2 class="t">되돌아오는 화살표가 <em>반복</em>이 된다</h2>
+  <div class="body cols c2b" style="align-items:start">
+    <div>
+      <svg class="dg" width="450" height="220" viewBox="0 0 450 220" role="img" aria-label="루프 그래프">
+        <rect class="term" x="0" y="76" width="72" height="34" rx="17"/><text class="term-t" x="36" y="98">START</text>
+        <path class="e" d="M80 93 L118 93"/>
+        <rect class="nd" x="126" y="64" width="164" height="58" rx="13"/><text class="nt" x="208" y="99">increment</text>
+        <path class="e-l" d="M290 80 C 356 80, 356 20, 208 20 L 208 20 L 208 56" marker-end="url(#ah-loop)"/>
+        <text class="lbl-l" x="300" y="14">count &lt; 5</text>
+        <path class="e" d="M208 122 L208 158"/>
+        <text class="lbl" x="272" y="146">count == 5</text>
+        <text class="term-t" x="208" y="180">END</text>
+        <text class="val" x="380" y="180">1 2 3 4 5</text>
+        <text class="lbl" x="380" y="200">출력 후 종료</text>
+      </svg>
+      <div class="note warn" style="margin-top:18px"><b>무한 루프 주의</b> — 반복에는 반드시 멈추는 조건이 있어야 합니다. LangGraph는 안전을 위해 기본 <span class="km">25</span>번까지만 돌고 멈춥니다(<span class="km">recursion_limit</span>).</div>
+      <p style="margin-top:12px;font-family:var(--mono);color:var(--muted);font-size:12.5px">📒 실습 노트북 Part 5</p>
+    </div>
+    <div class="code sm">
+      <div class="bar"><i></i>graph_05_loop.py</div>
+      <pre><code>class State(TypedDict):
+    count: int
+
+def increment(state):
+    new = state["count"] + 1
+    print(f"count: {new}")
+    return {"count": new}
+
+# 5 미만이면 계속, 아니면 끝
+def should_continue(state):
+    return "continue" if state["count"] &lt; 5 else "end"
+
+builder.add_node("increment", increment)
+builder.add_edge(START, "increment")
+builder.add_conditional_edges(
+    "increment", should_continue,
+    {"continue": "increment", "end": END}   # 자기 자신으로
+)
+
+graph.invoke({"count": 0})   # count: 1, 2, 3, 4, 5</code></pre>
+    </div>
+  </div>
+</section>
+
+<!-- 12 ─────────────────────────────── 시각화 -->
+<section class="slide" data-ch="6">
+  <p class="eyebrow">확인 · 시각화</p>
+  <h2 class="t">내가 만든 그래프, <em>그림으로 보기</em></h2>
+  <div class="body cols c2" style="align-items:center">
+    <div>
+      <div class="code">
+        <div class="bar"><i></i>visualize.py</div>
+        <pre><code># 그래프 구조를 mermaid 텍스트로 출력
+print(graph.get_graph().draw_mermaid())</code></pre>
+      </div>
+      <div class="note">출력된 mermaid 텍스트를 <span class="km">mermaid.live</span> 같은 곳에 붙이면 그림으로 볼 수 있습니다. <b>그래프가 복잡해질수록</b> 이 확인이 큰 도움이 됩니다.</div>
+      <p style="margin-top:14px;font-family:var(--mono);color:var(--muted);font-size:12.5px">📒 실습 노트북 Part 6</p>
+    </div>
+    <div>
+      <div class="code sm" style="background:#0F0D0A">
+        <div class="bar"><i></i>출력 예시</div>
+        <pre><code>graph TD;
+    __start__ --&gt; increment;
+    increment -.-&gt; increment;
+    increment -.-&gt; __end__;</code></pre>
+      </div>
+      <div class="chips">
+        <span class="chip">노드 이름이 그대로 보인다</span>
+        <span class="chip">점선 = 조건부 엣지</span>
+        <span class="chip">되돌아오는 화살표 = 루프</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 13 ─────────────────────────────── LLM 노드 -->
+<section class="slide" data-ch="6">
+  <p class="eyebrow">연결 · LLM 노드</p>
+  <h2 class="t">노드는 그냥 함수다 — <em>안에서 LLM을 불러도 된다</em></h2>
+  <div class="body cols c2b" style="align-items:start">
+    <div>
+      <svg class="dg" width="430" height="150" viewBox="0 0 430 150" role="img" aria-label="LLM 노드 그래프">
+        <rect class="sbox" x="60" y="8" width="300" height="34" rx="10"/>
+        <text class="sm" x="80" y="30" style="fill:#E3A33C">question: str · answer: str</text>
+        <rect class="term" x="0" y="76" width="72" height="34" rx="17"/><text class="term-t" x="36" y="98">START</text>
+        <path class="e" d="M80 93 L118 93"/>
+        <rect class="nd" x="126" y="64" width="164" height="58" rx="13"/><text class="nt" x="208" y="99">ask_llm</text>
+        <path class="e-s" d="M208 64 L208 42" marker-end="url(#ah-state)" marker-start="url(#ah-state)"/>
+        <path class="e" d="M298 93 L346 93"/>
+        <text class="term-t" x="376" y="98">END</text>
+        <text class="lbl" x="208" y="142">노드 안에서 llm.invoke()</text>
+      </svg>
+      <div class="note warn">이 부분만 <b>API 키가 필요</b>합니다. 앞의 예제들은 키 없이도 돌아갑니다.</div>
+      <div class="chip" style="margin-top:16px;display:block">여기에 <b>갈림길 · 반복 · 도구</b>를 더하면 다음 주 <b>에이전트</b>가 됩니다.</div>
+      <p style="margin-top:14px;font-family:var(--mono);color:var(--muted);font-size:12.5px">📒 실습 노트북 Part 7</p>
+    </div>
+    <div class="code sm">
+      <div class="bar"><i></i>graph_06_llm_node.py</div>
+      <pre><code>from langchain_google_genai import ChatGoogleGenerativeAI
+
+llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash",
+                             temperature=0)
+
+class QAState(TypedDict):
+    question: str
+    answer: str
+
+def ask_llm(state: QAState):          # 노드 안에서 LLM 호출
+    response = llm.invoke(state["question"])
+    return {"answer": response.content}
+
+builder = StateGraph(QAState)
+builder.add_node("ask_llm", ask_llm)
+builder.add_edge(START, "ask_llm")
+builder.add_edge("ask_llm", END)
+qa_graph = builder.compile()
+
+qa_graph.invoke({"question": "LangGraph를 한 문장으로"})</code></pre>
+    </div>
+  </div>
+</section>
+
+<!-- 14 ─────────────────────────────── 에이전트 예고 -->
+<section class="slide" data-ch="7">
+  <p class="eyebrow">15주차 예고 · 에이전트</p>
+  <h2 class="t">오늘 배운 네 조각이 <em>그대로 재료</em>가 된다</h2>
+  <div class="body cols c2a" style="align-items:center">
+    <div>
+      <svg class="dg" width="580" height="300" viewBox="0 0 580 300" role="img" aria-label="에이전트 그래프 구조">
+        <rect class="sbox" x="20" y="14" width="540" height="60" rx="13"/>
+        <text class="st" x="44" y="42">State — 대화 기억</text>
+        <text class="sm" x="44" y="63">messages: Annotated[list, add_messages]</text>
+
+        <rect class="term" x="20" y="150" width="72" height="34" rx="17"/><text class="term-t" x="56" y="172">START</text>
+        <path class="e" d="M100 167 L134 167"/>
+        <rect class="nd" x="142" y="138" width="150" height="58" rx="13"/>
+        <text class="nt-k" x="217" y="164">LLM 노드</text><text class="lbl" x="217" y="184" style="fill:#8E8474">생각한다</text>
+        <path class="e-s" d="M217 138 L217 74" marker-end="url(#ah-state)" marker-start="url(#ah-state)"/>
+
+        <path class="e" d="M300 167 L330 167"/>
+        <g><path d="M338 167 L392 132 L446 167 L392 202 Z" fill="rgba(111,182,169,.08)" stroke="#6FB6A9" stroke-width="1.5"/>
+        <text class="rt" x="392" y="164">도구</text><text class="rt" x="392" y="180">필요?</text></g>
+
+        <path class="e-c" d="M392 132 C 392 96, 340 96, 300 96"/>
+        <text class="lbl-c" x="352" y="88">예</text>
+        <rect class="nd" x="142" y="70" width="150" height="52" rx="12" style="stroke:#C56A82"/>
+        <text class="nt" x="217" y="102" style="font-size:13px">도구 실행</text>
+
+        <path class="e-l" d="M142 96 C 96 96, 96 138, 138 152" marker-end="url(#ah-loop)"/>
+        <text class="lbl-l" x="72" y="126">다시 생각</text>
+
+        <path class="e-c" d="M446 167 L500 167"/>
+        <text class="lbl-c" x="470" y="152">아니오</text>
+        <text class="term-t" x="528" y="172">END</text>
+
+        <text class="lbl" x="290" y="264">LLM 노드(생각) + 갈림길(도구 쓸까?) + 반복(결과 보고 다시) + 상태(대화 기억)</text>
+      </svg>
+    </div>
+    <div>
+      <div class="chips" style="flex-direction:column;align-items:stretch">
+        <span class="chip"><b style="color:#6FB6A9">Node</b> — LLM이 생각하는 자리</span>
+        <span class="chip"><b style="color:#6FB6A9">조건 분기</b> — 도구를 쓸지 말지 판단</span>
+        <span class="chip"><b style="color:#C56A82">루프</b> — 도구 결과를 보고 다시 생각</span>
+        <span class="chip"><b style="color:#E3A33C">Reducer</b> — 대화가 덮이지 않고 쌓임</span>
+      </div>
+      <div class="note" style="margin-top:20px">새로 배울 건 <b>도구(tool)를 붙이는 방법</b> 정도입니다. 나머지 뼈대는 오늘 이미 만들어 봤습니다.</div>
+    </div>
+  </div>
+</section>
+
+<!-- 15 ─────────────────────────────── 요약 표 -->
+<section class="slide" data-ch="7">
+  <p class="eyebrow">정리 · 한눈에</p>
+  <h2 class="t">오늘 배운 것</h2>
+  <div class="body">
+    <table class="sum">
+      <tr><th>개념</th><th>핵심 한 줄</th><th>코드</th></tr>
+      <tr><td><i class="d-state"></i>State</td><td>노드들이 함께 보는 공유 메모장</td><td><code>class State(TypedDict)</code></td></tr>
+      <tr><td><i class="d-node"></i>Node</td><td>상태를 받아 바뀔 부분만 반환하는 함수</td><td><code>add_node(name, fn)</code></td></tr>
+      <tr><td><i class="d-edge"></i>Edge</td><td>노드를 잇는 화살표</td><td><code>add_edge(a, b)</code></td></tr>
+      <tr><td><i class="d-state"></i>Reducer</td><td>덮어쓰기(기본) vs 이어붙이기</td><td><code>Annotated[list, operator.add]</code></td></tr>
+      <tr><td><i class="d-node"></i>조건 분기</td><td>라우터 함수가 반환한 이름표로 갈림길</td><td><code>add_conditional_edges(...)</code></td></tr>
+      <tr><td><i class="d-loop"></i>반복</td><td>자기 자신으로 되돌아오는 조건 분기 · 멈춤 조건 필수</td><td><code>{"continue": "self"}</code></td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- 16 ─────────────────────────────── 코드 패턴 -->
+<section class="slide" data-ch="7">
+  <p class="eyebrow">정리 · 코드 패턴</p>
+  <h2 class="t">이 형태만 기억하면 됩니다</h2>
+  <div class="body cols c2a" style="align-items:start">
+    <div class="code xs">
+      <div class="bar"><i></i>langgraph_pattern.py</div>
+      <pre><code>from typing import Annotated
+from langgraph.graph import StateGraph, START, END
+import operator
+
+# ① 상태 — 이어붙일 필드엔 reducer
+class State(TypedDict):
+    number: int
+    log: Annotated[list, operator.add]
+
+# ② 노드 — 바뀔 부분만 반환
+def step(state):
+    return {"number": state["number"] + 1, "log": ["실행"]}
+
+# ③ 라우터 — 갈 곳의 이름표 반환
+def route(state):
+    return "again" if state["number"] &lt; 5 else "end"
+
+# ④ 조립 — 노드 등록 → 엣지 연결 → compile
+builder = StateGraph(State)
+builder.add_node("step", step)
+builder.add_edge(START, "step")
+builder.add_conditional_edges("step", route,
+                              {"again": "step", "end": END})
+graph = builder.compile()</code></pre>
+    </div>
+    <div>
+      <div class="card"><span class="tag">순서</span>
+        <h3>① 상태 → ② 노드 → ③ 라우터 → ④ 조립</h3>
+        <p>어떤 그래프를 만들든 이 네 단계입니다. 복잡한 그래프는 ②와 ③이 늘어날 뿐, 뼈대는 같습니다.</p>
+      </div>
+      <div class="chips" style="flex-direction:column;align-items:stretch">
+        <span class="chip"><b>막힐 때 1</b> — 상태에 필드가 빠지지 않았나</span>
+        <span class="chip"><b>막힐 때 2</b> — 라우터가 반환한 이름표가 지도에 있나</span>
+        <span class="chip"><b>막힐 때 3</b> — 루프에 멈춤 조건이 있나</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 17 ─────────────────────────────── 실습 매핑 -->
+<section class="slide" data-ch="7">
+  <p class="eyebrow">실습 · 노트북 매핑</p>
+  <h2 class="t">이제 <em>직접</em> 돌려봅시다</h2>
+  <div class="body">
+    <ul class="parts">
+      <li><span class="p">PART 1</span><span class="n">첫 그래프</span><span class="k">노드 1개 · compile</span></li>
+      <li><span class="p">PART 2</span><span class="n">노드 여러 개</span><span class="k">순차 실행</span></li>
+      <li><span class="p">PART 3</span><span class="n">Reducer</span><span class="k">덮어쓰기 vs 이어붙이기</span></li>
+      <li><span class="p">PART 4</span><span class="n">조건 분기</span><span class="k">add_conditional_edges</span></li>
+      <li><span class="p">PART 5</span><span class="n">루프</span><span class="k">recursion_limit</span></li>
+      <li><span class="p">PART 6</span><span class="n">시각화</span><span class="k">draw_mermaid</span></li>
+      <li><span class="p">PART 7</span><span class="n">LLM 노드</span><span class="k">API 키 필요</span></li>
+      <li style="border-color:#E3A33C;background:rgba(227,163,60,.06)"><span class="p">NEXT</span><span class="n">15주차 · 에이전트</span><span class="k">도구 + 갈림길 + 반복</span></li>
+    </ul>
+    <div class="note" style="margin-top:26px">Part 1–6은 <b>API 키 없이</b> 돌아갑니다. 오늘 그래프를 손에 익혀두면, 다음 주에는 도구를 붙이는 것만 새로 배우면 됩니다.</div>
+  </div>
+</section>
+
+<!-- ── 하단 진행 그래프 ── -->
+<nav id="rail" aria-label="진행 상황">
+  <ol>
+    <li data-ch="0" tabindex="0"><span class="dot"></span><span class="lb">개요</span></li>
+    <li data-ch="1" tabindex="0"><span class="dot"></span><span class="lb">개념</span></li>
+    <li data-ch="2" tabindex="0"><span class="dot"></span><span class="lb">노드</span></li>
+    <li data-ch="3" tabindex="0"><span class="dot"></span><span class="lb">상태</span></li>
+    <li data-ch="4" tabindex="0"><span class="dot"></span><span class="lb">분기</span></li>
+    <li data-ch="5" tabindex="0"><span class="dot"></span><span class="lb">루프</span></li>
+    <li data-ch="6" tabindex="0"><span class="dot"></span><span class="lb">LLM</span></li>
+    <li data-ch="7" tabindex="0"><span class="dot"></span><span class="lb">정리</span></li>
+  </ol>
+  <svg class="arc" width="150" height="26" viewBox="0 0 150 26" aria-hidden="true">
+    <path d="M144 22 C 144 2, 8 2, 8 18" fill="none" stroke="#C56A82" stroke-width="1.2" stroke-dasharray="4 4" marker-end="url(#ah-loop)"/>
+  </svg>
+</nav>
+
+<div id="hud">
+  <span id="count"><b>01</b> / <span id="tot">17</span></span>
+  <span class="nav"><button id="prev" aria-label="이전 슬라이드">‹</button><button id="next" aria-label="다음 슬라이드">›</button></span>
+</div>
+
+</div><!-- /stage -->
+</div><!-- /viewport -->
+
+<script>
+(function(){
+  var stage = document.getElementById('stage');
+  var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var railItems = Array.prototype.slice.call(document.querySelectorAll('#rail li'));
+  var cur = document.querySelector('#count b');
+  document.getElementById('tot').textContent = String(slides.length).padStart(2,'0');
+  var i = 0;
+
+  // 각 챕터가 시작하는 슬라이드 인덱스
+  var chapterStart = {};
+  slides.forEach(function(s,k){
+    var c = s.dataset.ch;
+    if(!(c in chapterStart)) chapterStart[c] = k;
+  });
+
+  function go(n){
+    i = Math.max(0, Math.min(slides.length-1, n));
+    slides.forEach(function(s,k){ s.classList.toggle('is-active', k===i); });
+    cur.textContent = String(i+1).padStart(2,'0');
+    var ch = +slides[i].dataset.ch;
+    railItems.forEach(function(el,k){
+      el.classList.toggle('on', k===ch);
+      el.classList.toggle('done', k<ch);
+    });
+  }
+
+  function fit(){
+    var s = Math.min(window.innerWidth/1280, window.innerHeight/720);
+    stage.style.transform = 'scale(' + s + ')';
+  }
+  window.addEventListener('resize', fit); fit();
+
+  document.addEventListener('keydown', function(e){
+    if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown'||e.key==='Enter'){ e.preventDefault(); go(i+1); }
+    else if(e.key==='ArrowLeft'||e.key==='PageUp'||e.key==='Backspace'){ e.preventDefault(); go(i-1); }
+    else if(e.key==='Home'){ go(0); }
+    else if(e.key==='End'){ go(slides.length-1); }
+    else if(e.key==='f'||e.key==='F'){
+      if(document.fullscreenElement) document.exitFullscreen();
+      else document.documentElement.requestFullscreen();
+    }
+  });
+
+  document.getElementById('next').addEventListener('click', function(){ go(i+1); });
+  document.getElementById('prev').addEventListener('click', function(){ go(i-1); });
+  railItems.forEach(function(el){
+    function jump(){ go(chapterStart[el.dataset.ch]); }
+    el.addEventListener('click', jump);
+    el.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); jump(); }});
+  });
+
+  var x0 = null;
+  stage.addEventListener('touchstart', function(e){ x0 = e.changedTouches[0].clientX; }, {passive:true});
+  stage.addEventListener('touchend', function(e){
+    if(x0===null) return;
+    var dx = e.changedTouches[0].clientX - x0;
+    if(Math.abs(dx) > 50) go(dx < 0 ? i+1 : i-1);
+    x0 = null;
+  }, {passive:true});
+
+  // 파이썬 코드 하이라이트
+  var RE = /(#[^\n]*)|("(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*')|\b(from|import|def|return|class|if|else|elif|for|while|lambda|True|False|None|in|not|and|or|print)\b|\b(\d+)\b|\b([A-Za-z_][A-Za-z0-9_]*)(?=\()/g;
+  function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  document.querySelectorAll('.code code').forEach(function(el){
+    var src = el.textContent, out = '', last = 0, m;
+    RE.lastIndex = 0;
+    while((m = RE.exec(src)) !== null){
+      out += esc(src.slice(last, m.index));
+      var cls = m[1] ? 'tk-c' : m[2] ? 'tk-s' : m[3] ? 'tk-k' : m[4] ? 'tk-n' : 'tk-f';
+      out += '<span class="' + cls + '">' + esc(m[0]) + '</span>';
+      last = m.index + m[0].length;
+    }
+    out += esc(src.slice(last));
+    el.innerHTML = out;
+  });
+
+  go(0);
+})();
+</script>
+</body>
+</html>
