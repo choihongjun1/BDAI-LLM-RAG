@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>15주차 · LangGraph 멀티턴 · 분기 챗봇</title>
+<style>
+  :root{
+    --ink:#16181d;
+    --ink-2:#454a54;
+    --ink-3:#7a808c;
+    --line:#e3e6ec;
+    --bg:#ffffff;
+    --soft:#f5f7fa;
+    --brand:#2f6df6;
+    --brand-soft:#e8effe;
+    --accent:#e0632b;
+    --accent-soft:#fdece4;
+    --good:#1f9268;
+    --good-soft:#e4f5ee;
+    --code-bg:#1c2028;
+    --code-ink:#e6e9ef;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;background:#20242c;overflow:hidden}
+  body{
+    font-family:"Pretendard","Pretendard Variable",-apple-system,BlinkMacSystemFont,
+      "Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",sans-serif;
+    color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+  }
+  #viewport{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+  #stage{width:1280px;height:720px;position:relative;transform-origin:center center;
+         background:var(--bg);box-shadow:0 24px 70px rgba(0,0,0,.45);border-radius:6px;overflow:hidden}
+
+  .slide{position:absolute;inset:0;padding:58px 72px 64px;display:none;flex-direction:column}
+  .slide.on{display:flex;animation:fade .28s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  /* ── 타이포 ── */
+  .eyebrow{font-size:15px;font-weight:700;color:var(--brand);letter-spacing:.06em;margin-bottom:14px}
+  h1{font-size:52px;line-height:1.22;font-weight:800;letter-spacing:-.02em}
+  h2{font-size:38px;line-height:1.28;font-weight:800;letter-spacing:-.02em;margin-bottom:8px}
+  h3{font-size:21px;font-weight:700;margin-bottom:10px}
+  .sub{font-size:19px;color:var(--ink-2);line-height:1.6;margin-bottom:26px}
+  p{font-size:19px;line-height:1.68;color:var(--ink-2)}
+  strong{color:var(--ink);font-weight:700}
+  .hl{background:linear-gradient(transparent 62%, #ffe27a 62%);padding:0 2px}
+
+  ul{list-style:none}
+  li{font-size:19px;line-height:1.62;color:var(--ink-2);padding-left:26px;position:relative;margin-bottom:13px}
+  li::before{content:"";position:absolute;left:6px;top:12px;width:7px;height:7px;border-radius:50%;background:var(--brand);opacity:.55}
+  li b{color:var(--ink);font-weight:700}
+  ol{counter-reset:n;list-style:none}
+  ol li{padding-left:38px}
+  ol li::before{counter-increment:n;content:counter(n);left:0;top:2px;width:24px;height:24px;border-radius:7px;
+    background:var(--brand);opacity:1;color:#fff;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center}
+
+  /* ── 레이아웃 ── */
+  .body{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center}
+  .cols{display:flex;gap:30px;align-items:stretch}
+  .cols>*{flex:1;min-width:0}
+  .cols.a1-1_3>*:first-child{flex:1}
+  .cols.a1-1_3>*:last-child{flex:1.35}
+
+  .card{background:var(--soft);border:1px solid var(--line);border-radius:14px;padding:22px 24px}
+  .card.brand{background:var(--brand-soft);border-color:#cddcfd}
+  .card.accent{background:var(--accent-soft);border-color:#f8d5c3}
+  .card.good{background:var(--good-soft);border-color:#c7e9da}
+  .card h3{font-size:18px}
+  .card p,.card li{font-size:17px;line-height:1.6}
+  .card li{margin-bottom:8px}
+
+  /* ── 코드 ── */
+  pre{background:var(--code-bg);color:var(--code-ink);border-radius:12px;padding:20px 22px;
+      font-family:ui-monospace,SFMono-Regular,"D2Coding",Consolas,"Courier New",monospace;
+      font-size:16.5px;line-height:1.65;overflow:hidden;white-space:pre;letter-spacing:-.01em}
+  pre.sm{font-size:14.5px;line-height:1.6;padding:16px 18px}
+  pre .c{color:#8b96a8}          /* 주석 */
+  pre .k{color:#ff9ec4}          /* 키워드 */
+  pre .s{color:#9ee6a0}          /* 문자열 */
+  pre .f{color:#8cc7ff}          /* 함수/속성 */
+  pre .n{color:#ffd479}          /* 숫자·상수 */
+  code{background:var(--soft);border:1px solid var(--line);border-radius:6px;padding:1px 6px;
+       font-family:ui-monospace,"D2Coding",Consolas,monospace;font-size:.92em;color:#c0392b}
+
+  /* ── 표 ── */
+  table{width:100%;border-collapse:collapse;font-size:17.5px}
+  th,td{text-align:left;padding:13px 16px;border-bottom:1px solid var(--line);color:var(--ink-2);vertical-align:top}
+  th{font-size:14px;font-weight:800;color:var(--ink-3);letter-spacing:.04em;text-transform:uppercase;border-bottom:2px solid var(--line)}
+  td b{color:var(--ink)}
+  tr:last-child td{border-bottom:none}
+  td code{font-size:15.5px}
+
+  /* ── 다이어그램 ── */
+  .flow{display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap}
+  .node{border:2px solid var(--brand);background:#fff;color:var(--brand);font-weight:800;
+        border-radius:11px;padding:14px 20px;font-size:18px;white-space:nowrap;
+        font-family:ui-monospace,"D2Coding",Consolas,monospace}
+  .node.plain{border-color:var(--line);color:var(--ink-2);background:var(--soft);font-family:inherit}
+  .node.acc{border-color:var(--accent);color:var(--accent)}
+  .node.term{border-color:var(--ink-3);color:var(--ink-3);border-radius:999px}
+  .arrow{color:var(--ink-3);font-size:24px;font-weight:700}
+  .arrow small{display:block;font-size:12px;font-weight:700;text-align:center;margin-top:-4px}
+  .branch{display:flex;flex-direction:column;gap:14px}
+
+  .state-bar{border:2px dashed #b9c4d6;border-radius:12px;background:#fbfcfe;
+             padding:12px 18px;text-align:center;font-size:16px;color:var(--ink-2);font-weight:600}
+
+  .kv{display:flex;gap:12px;align-items:flex-start;margin-bottom:14px}
+  .kv .tag{flex:0 0 auto;background:var(--ink);color:#fff;border-radius:7px;font-size:13px;font-weight:800;
+           padding:5px 11px;margin-top:2px}
+  .kv .tag.b{background:var(--brand)} .kv .tag.a{background:var(--accent)} .kv .tag.g{background:var(--good)}
+  .kv p{font-size:18px}
+
+  .chat{background:var(--soft);border:1px solid var(--line);border-radius:14px;padding:18px 20px;font-size:17px}
+  .chat .me{color:var(--ink-3);font-weight:700;margin-bottom:3px}
+  .chat .bot{color:var(--ink);font-weight:600;margin-bottom:14px}
+  .chat .bot:last-child{margin-bottom:0}
+  .chat .via{display:inline-block;font-size:12px;font-weight:800;border-radius:5px;padding:2px 7px;margin-left:6px;
+             background:var(--brand-soft);color:var(--brand);font-family:ui-monospace,monospace}
+  .chat .via.a{background:var(--accent-soft);color:var(--accent)}
+
+  .note{margin-top:20px;border-left:4px solid var(--accent);background:var(--accent-soft);
+        border-radius:0 10px 10px 0;padding:14px 18px;font-size:17px;color:#8a4622;line-height:1.6}
+  .note b{color:#6f3316}
+  .note.b{border-color:var(--brand);background:var(--brand-soft);color:#22458f}
+  .note.b b{color:#17306a}
+
+  /* ── 표지 / 간지 ── */
+  .title-slide{background:linear-gradient(140deg,#1d2330 0%,#2b3a5c 55%,#2f6df6 140%);color:#fff;justify-content:center}
+  .title-slide .eyebrow{color:#8fb6ff}
+  .title-slide h1{color:#fff;font-size:62px}
+  .title-slide p{color:#c6d3ea;font-size:21px;margin-top:20px}
+  .title-slide .meta{margin-top:44px;display:flex;gap:12px;flex-wrap:wrap}
+  .pill{border:1px solid rgba(255,255,255,.32);color:#dce6f8;border-radius:999px;padding:8px 18px;font-size:15.5px;font-weight:600}
+
+  .section-slide{background:var(--ink);color:#fff;justify-content:center;align-items:flex-start}
+  .section-slide .num{font-size:15px;font-weight:800;color:#6f8cff;letter-spacing:.14em;margin-bottom:16px}
+  .section-slide h1{color:#fff;font-size:56px}
+  .section-slide p{color:#a7adba;margin-top:16px;font-size:20px}
+
+  /* ── 크롬 ── */
+  .foot{position:absolute;left:72px;right:72px;bottom:22px;display:flex;justify-content:space-between;
+        align-items:center;font-size:13px;color:var(--ink-3);font-weight:600;letter-spacing:.02em}
+  .title-slide .foot,.section-slide .foot{color:rgba(255,255,255,.5)}
+  .bar{position:absolute;left:0;bottom:0;height:4px;background:var(--brand);transition:width .28s ease;z-index:5}
+
+  #help{position:fixed;left:50%;transform:translateX(-50%);bottom:14px;color:#8d95a5;font-size:12.5px;
+        background:rgba(0,0,0,.35);padding:6px 14px;border-radius:999px;transition:opacity .4s;z-index:20}
+  #help.hide{opacity:0}
+
+  @media print{
+    html,body{overflow:visible;background:#fff}
+    #viewport{position:static}
+    #stage{transform:none!important;box-shadow:none;border-radius:0}
+    .slide{display:flex!important;position:relative;page-break-after:always;width:1280px;height:720px}
+    #help{display:none}
+  }
+</style>
+</head>
+<body>
+<div id="viewport">
+  <div id="stage">
+
+    <!-- 1 -->
+    <section class="slide title-slide">
+      <div class="eyebrow">LangChain 실무 과정 · 15주차</div>
+      <h1>LangGraph로 만드는<br>멀티턴 · 분기 챗봇</h1>
+      <p>대화를 기억하고, 질문에 따라 스스로 길을 고르는 챗봇 만들기</p>
+      <div class="meta">
+        <span class="pill">60분</span>
+        <span class="pill">실습 노트북 Part 0–7</span>
+        <span class="pill">API 키 필요 (LLM만)</span>
+      </div>
+      <div class="foot"><span>15주차</span><span>1</span></div>
+    </section>
+
+    <!-- 2 -->
+    <section class="slide">
+      <div class="eyebrow">학습목표</div>
+      <h2>오늘 끝나면 할 수 있는 것</h2>
+      <div class="body">
+        <ol>
+          <li><b>add_messages</b> 리듀서로 대화 기록을 쌓는 멀티턴 챗봇을 만든다</li>
+          <li><b>MemorySaver</b>와 <b>thread_id</b>로 대화를 자동 저장·복원한다</li>
+          <li>질문을 보고 갈 길을 정하는 <b>라우터</b>를 만든다</li>
+          <li><b>일반 대화 챗봇</b>과 <b>문서 Q&amp;A 챗봇</b>을 한 그래프에서 분기시킨다</li>
+          <li>완성한 그래프를 <b>시각화</b>하고 대화로 검증한다</li>
+        </ol>
+      </div>
+      <div class="foot"><span>15주차 · 학습목표</span><span>2</span></div>
+    </section>
+
+    <!-- 3 -->
+    <section class="slide">
+      <div class="eyebrow">복습</div>
+      <h2>14주차에서 배운 재료</h2>
+      <p class="sub">오늘은 새 문법을 거의 배우지 않습니다. <strong>지난주 재료로 진짜 챗봇 하나를 조립</strong>합니다.</p>
+      <div class="body">
+        <table>
+          <tr><td style="width:150px"><b>State</b></td><td>노드들이 함께 보는 공유 메모장 (<code>TypedDict</code>)</td></tr>
+          <tr><td><b>Node</b></td><td>상태를 받아 <b>바뀔 부분만</b> 반환하는 함수</td></tr>
+          <tr><td><b>Edge</b></td><td>노드를 잇는 화살표 (<code>add_edge</code>)</td></tr>
+          <tr><td><b>Reducer</b></td><td>덮어쓰기(기본) vs 이어붙이기(<code>operator.add</code>)</td></tr>
+          <tr><td><b>조건 분기</b></td><td>라우터 함수 + <code>add_conditional_edges</code></td></tr>
+        </table>
+        <div class="note b"><b>오늘 새로 배우는 것은 딱 셋.</b> add_messages · MemorySaver · thread_id</div>
+      </div>
+      <div class="foot"><span>15주차 · 복습</span><span>3</span></div>
+    </section>
+
+    <!-- 4 -->
+    <section class="slide">
+      <div class="eyebrow">오늘 만들 것</div>
+      <h2>질문을 보고 갈라지는 챗봇</h2>
+      <div class="body">
+        <div class="state-bar" style="margin-bottom:28px">State &nbsp;·&nbsp; messages — 두 챗봇이 <b>하나의 대화 기록</b>을 공유한다</div>
+        <div class="flow">
+          <div class="node term">START</div>
+          <div class="arrow">→</div>
+          <div class="node acc">route</div>
+          <div class="arrow">→</div>
+          <div class="branch">
+            <div class="node">chat_bot<small style="display:block;font-size:11px;font-weight:600;color:var(--ink-3);font-family:inherit;margin-top:3px">잡담 · 일반질문</small></div>
+            <div class="node">rag_bot<small style="display:block;font-size:11px;font-weight:600;color:var(--ink-3);font-family:inherit;margin-top:3px">문서 검색 → 답변</small></div>
+          </div>
+          <div class="arrow">→</div>
+          <div class="node term">END</div>
+        </div>
+        <div class="note">+ <b>checkpointer</b>를 붙이면 <b>thread_id</b>별로 대화를 기억합니다 (멀티턴)</div>
+      </div>
+      <div class="foot"><span>15주차 · 오늘 만들 것</span><span>4</span></div>
+    </section>
+
+    <!-- 5 -->
+    <section class="slide section-slide">
+      <div class="num">PART 1 · 2</div>
+      <h1>멀티턴 — 대화를 기억하기</h1>
+      <p>add_messages · MemorySaver · thread_id</p>
+      <div class="foot"><span></span><span>5</span></div>
+    </section>
+
+    <!-- 6 -->
+    <section class="slide">
+      <div class="eyebrow">문제 상황</div>
+      <h2>기억하지 못하는 챗봇</h2>
+      <div class="body">
+        <div class="cols">
+          <div>
+            <pre class="sm"><span class="c"># 이번 질문 한 줄만 넘긴다</span>
+<span class="k">def</span> <span class="f">ask_llm</span>(state):
+    res = llm.<span class="f">invoke</span>(state[<span class="s">"question"</span>])
+    <span class="k">return</span> {<span class="s">"answer"</span>: res.text}</pre>
+            <div class="note" style="margin-top:18px">LLM은 <b>매번 처음 보는 사람처럼</b> 반응합니다</div>
+          </div>
+          <div class="chat">
+            <div class="me">나 : 내 이름은 김철수야.</div>
+            <div class="bot">봇 : 반갑습니다, 김철수님!</div>
+            <div class="me">나 : 내 이름이 뭐라고?</div>
+            <div class="bot" style="color:#c0392b">봇 : 죄송해요, 알 수 없습니다. 😵</div>
+          </div>
+        </div>
+      </div>
+      <div class="foot"><span>15주차 · 멀티턴</span><span>6</span></div>
+    </section>
+
+    <!-- 7 -->
+    <section class="slide">
+      <div class="eyebrow">해결책</div>
+      <h2>지금까지의 대화를 통째로 넘긴다</h2>
+      <div class="body">
+        <pre>[1턴]  llm.invoke([ 사용자: <span class="s">"내 이름은 김철수야"</span> ])
+
+[2턴]  llm.invoke([ 사용자: <span class="s">"내 이름은 김철수야"</span>,
+                    봇   : <span class="s">"반갑습니다, 김철수님!"</span>,
+                    사용자: <span class="s">"내 이름이 뭐라고?"</span> ])   <span class="c">← 앞 내용이 다 들어있음 ✅</span></pre>
+        <div class="note b">그러니 우리가 할 일은 <b>대화 목록을 계속 쌓아두는 것</b>.<br>
+          그리고 "쌓아두기"는 14주차에서 배운 <b>리듀서</b>의 일입니다.</div>
+      </div>
+      <div class="foot"><span>15주차 · 멀티턴</span><span>7</span></div>
+    </section>
+
+    <!-- 8 -->
+    <section class="slide">
+      <div class="eyebrow">Part 1</div>
+      <h2><code style="font-size:34px">add_messages</code> — 메시지 전용 리듀서</h2>
+      <div class="body">
+        <div class="cols">
+          <div class="card accent">
+            <h3>리듀서 없음 = 덮어쓰기</h3>
+            <pre class="sm" style="background:#2a1f1a">[질문1]
+  → 노드가 [답변1] 반환
+  → <span class="c">[답변1]</span>
+
+<span class="c">❌ 질문이 사라진다</span></pre>
+          </div>
+          <div class="card good">
+            <h3>add_messages = 이어붙이기</h3>
+            <pre class="sm" style="background:#152520">[질문1]
+  → 노드가 [답변1] 반환
+  → <span class="s">[질문1, 답변1]</span>
+
+<span class="c">✅ 대화가 쌓인다</span></pre>
+          </div>
+        </div>
+        <pre style="margin-top:24px"><span class="k">class</span> <span class="f">State</span>(TypedDict):
+    messages: <span class="f">Annotated</span>[<span class="k">list</span>, add_messages]   <span class="c"># ← 이 한 줄이 전부</span></pre>
+      </div>
+      <div class="foot"><span>15주차 · Part 1</span><span>8</span></div>
+    </section>
+
+    <!-- 9 -->
+    <section class="slide">
+      <div class="eyebrow">Part 1</div>
+      <h2>첫 멀티턴 챗봇</h2>
+      <div class="body">
+        <pre><span class="k">class</span> <span class="f">State</span>(TypedDict):
+    messages: <span class="f">Annotated</span>[<span class="k">list</span>, add_messages]
+
+<span class="k">def</span> <span class="f">chatbot</span>(state: State):
+    response = llm.<span class="f">invoke</span>(state[<span class="s">"messages"</span>])   <span class="c"># 대화 전체를 넘긴다</span>
+    <span class="k">return</span> {<span class="s">"messages"</span>: [response]}          <span class="c"># 답변만 반환 → 뒤에 이어붙음</span>
+
+builder = <span class="f">StateGraph</span>(State)
+builder.<span class="f">add_node</span>(<span class="s">"chatbot"</span>, chatbot)
+builder.<span class="f">add_edge</span>(START, <span class="s">"chatbot"</span>)
+builder.<span class="f">add_edge</span>(<span class="s">"chatbot"</span>, END)
+graph = builder.<span class="f">compile</span>()</pre>
+        <div class="note">잘 되지만 매 턴 <b>state["messages"]를 직접 들고 다녀야</b> 합니다 → 다음 장에서 자동화</div>
+      </div>
+      <div class="foot"><span>15주차 · Part 1</span><span>9</span></div>
+    </section>
+
+    <!-- 10 -->
+    <section class="slide">
+      <div class="eyebrow">Part 2</div>
+      <h2>체크포인터 — 대화를 자동으로 기억</h2>
+      <div class="body">
+        <pre><span class="k">from</span> langgraph.checkpoint.memory <span class="k">import</span> MemorySaver
+
+graph = builder.<span class="f">compile</span>(checkpointer=<span class="f">MemorySaver</span>())   <span class="c"># ← 이 한 줄이 전부</span>
+
+config = {<span class="s">"configurable"</span>: {<span class="s">"thread_id"</span>: <span class="s">"user-1"</span>}}      <span class="c"># 대화방 번호</span>
+
+graph.<span class="f">invoke</span>({<span class="s">"messages"</span>: [{<span class="s">"role"</span>:<span class="s">"user"</span>,<span class="s">"content"</span>:<span class="s">"내 이름은 김철수야."</span>}]}, config)
+r = graph.<span class="f">invoke</span>({<span class="s">"messages"</span>: [{<span class="s">"role"</span>:<span class="s">"user"</span>,<span class="s">"content"</span>:<span class="s">"내 이름이 뭐라고?"</span>}]}, config)
+
+<span class="f">print</span>(r[<span class="s">"messages"</span>][-<span class="n">1</span>].text)   <span class="c"># → 김철수님이요! ✅</span></pre>
+        <div class="note b"><b>새 질문만 넣었는데도 기억합니다.</b> 앞 대화는 체크포인터가 알아서 꺼내 붙여줬습니다.</div>
+      </div>
+      <div class="foot"><span>15주차 · Part 2</span><span>10</span></div>
+    </section>
+
+    <!-- 11 -->
+    <section class="slide">
+      <div class="eyebrow">Part 2</div>
+      <h2><code style="font-size:34px">thread_id</code> = 대화방 번호</h2>
+      <div class="body">
+        <div class="cols">
+          <div>
+            <div class="card" style="margin-bottom:16px">
+              <h3 style="color:var(--brand)">📁 thread_id = "user-1"</h3>
+              <p style="font-size:16px">[질문1, 답변1, 질문2, 답변2, …]</p>
+            </div>
+            <div class="card">
+              <h3 style="color:var(--accent)">📁 thread_id = "user-2"</h3>
+              <p style="font-size:16px">[ … 완전히 별개의 대화 … ]</p>
+            </div>
+          </div>
+          <div>
+            <ul>
+              <li>사용자 ID, 세션 ID, UUID — <b>구분만 되면 아무 문자열</b>이나 OK</li>
+              <li>같은 값 → 대화가 이어짐 / 새 값 → 새 대화 시작</li>
+              <li><code>MemorySaver</code>는 램에 저장 → 프로그램 끄면 사라짐</li>
+              <li>영구 저장은 <code>SqliteSaver</code> 등 (오늘은 불필요)</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="foot"><span>15주차 · Part 2</span><span>11</span></div>
+    </section>
+
+    <!-- 12 -->
+    <section class="slide section-slide">
+      <div class="num">PART 3 · 4</div>
+      <h1>분기 — 두 번째 챗봇과 갈림길</h1>
+      <p>문서 Q&amp;A 챗봇 · 라우터</p>
+      <div class="foot"><span></span><span>12</span></div>
+    </section>
+
+    <!-- 13 -->
+    <section class="slide">
+      <div class="eyebrow">Part 3</div>
+      <h2>문서 창고와 검색기</h2>
+      <div class="body">
+        <pre class="sm">docs = [
+    <span class="s">"우리 학원의 수강료 환불은 개강일로부터 7일 이내에 신청하면 전액 환불됩니다."</span>,
+    <span class="s">"수업은 매주 화요일과 목요일 저녁 7시부터 10시까지 진행됩니다."</span>,
+    <span class="s">"결석 시 녹화 영상이 제공되며, 링크는 수업 다음 날 오전에 발송됩니다."</span>,
+    <span class="s">"수료 조건은 전체 수업의 80% 이상 출석과 최종 프로젝트 제출입니다."</span>,
+]
+
+retriever = <span class="f">SimpleRetriever</span>(docs)      <span class="c"># 질문과 겹치는 글자로 문장 2개 찾기</span>
+retriever.<span class="f">invoke</span>(<span class="s">"환불 언제까지 되나요?"</span>)</pre>
+        <div class="note"><b>오늘은 임베딩 API를 쓰지 않습니다.</b> 오늘의 주제는 검색 성능이 아니라 <b>그래프 분기</b>이고,
+          임베딩 API는 키·모델명·서버 상태에 따라 자주 막히기 때문입니다. 사용법(<code>retriever.invoke</code>)은 동일하므로 나중에 벡터 검색으로 갈아 끼우면 됩니다.</div>
+      </div>
+      <div class="foot"><span>15주차 · Part 3</span><span>13</span></div>
+    </section>
+
+    <!-- 14 -->
+    <section class="slide">
+      <div class="eyebrow">Part 3</div>
+      <h2>rag_bot — 검색해서 답하는 노드</h2>
+      <div class="body">
+        <pre class="sm"><span class="k">def</span> <span class="f">rag_bot</span>(state: State):
+    question = state[<span class="s">"messages"</span>][-<span class="n">1</span>].text                       <span class="c"># ① 마지막 질문</span>
+    context  = <span class="s">"\n"</span>.<span class="f">join</span>(d.page_content <span class="k">for</span> d <span class="k">in</span> retriever.<span class="f">invoke</span>(question))   <span class="c"># ② 검색</span>
+
+    prompt = <span class="s">f"""아래 자료만 근거로 질문에 답하세요.</span>
+<span class="s">자료에 없으면 "자료에서 찾을 수 없습니다"라고 답하세요.</span>
+
+<span class="s">[자료] {context}</span>
+<span class="s">[질문] {question}"""</span>                                     <span class="c"># ③ 프롬프트 조립</span>
+
+    <span class="k">return</span> {<span class="s">"messages"</span>: [llm.<span class="f">invoke</span>(prompt)]}                  <span class="c"># ④ 답변 반환</span></pre>
+        <div class="note b"><b>핵심 — 입출력 모양이 chat_bot과 똑같습니다.</b>
+          messages를 받아 messages를 반환하므로, 갈아 끼우듯 분기할 수 있습니다.</div>
+      </div>
+      <div class="foot"><span>15주차 · Part 3</span><span>14</span></div>
+    </section>
+
+    <!-- 15 -->
+    <section class="slide">
+      <div class="eyebrow">Part 4</div>
+      <h2>라우터 — 갈림길 표지판</h2>
+      <div class="body">
+        <div class="cols a1-1_3">
+          <div>
+            <div class="kv"><span class="tag b">입력</span><p>상태 <code>state</code></p></div>
+            <div class="kv"><span class="tag a">출력</span><p>갈 곳의 <b>이름표 문자열</b></p></div>
+            <div class="card" style="margin-top:6px">
+              <p style="font-size:16px">LLM은 가끔 <code>"docs입니다."</code>처럼 답합니다.<br>
+              <b>== 대신 in</b> 으로 느슨하게 검사하고,<br>애매하면 <b>기본값(chat)</b>으로 보냅니다.</p>
+            </div>
+          </div>
+          <div>
+            <pre class="sm"><span class="k">def</span> <span class="f">route</span>(state: State):
+    q = state[<span class="s">"messages"</span>][-<span class="n">1</span>].text
+
+    <span class="c"># LLM에게 분류를 맡긴다</span>
+    a = llm.<span class="f">invoke</span>(
+        ROUTER_PROMPT.<span class="f">format</span>(question=q)
+    ).text.<span class="f">strip</span>().<span class="f">lower</span>()
+
+    <span class="k">return</span> <span class="s">"docs"</span> <span class="k">if</span> <span class="s">"docs"</span> <span class="k">in</span> a <span class="k">else</span> <span class="s">"chat"</span></pre>
+          </div>
+        </div>
+        <div class="note">그래프에 넣기 전에 <b>라우터만 따로 돌려보는 습관</b>을 들이세요. 분기가 엉뚱하면 여기서 잡힙니다.</div>
+      </div>
+      <div class="foot"><span>15주차 · Part 4</span><span>15</span></div>
+    </section>
+
+    <!-- 16 -->
+    <section class="slide section-slide">
+      <div class="num">PART 5 · 6</div>
+      <h1>조립 — 하나의 그래프로</h1>
+      <p>완성 · 실행 · 시각화</p>
+      <div class="foot"><span></span><span>16</span></div>
+    </section>
+
+    <!-- 17 -->
+    <section class="slide">
+      <div class="eyebrow">Part 5</div>
+      <h2>전부 합치기</h2>
+      <div class="body">
+        <pre>builder = <span class="f">StateGraph</span>(State)
+builder.<span class="f">add_node</span>(<span class="s">"chat_bot"</span>, chat_bot)
+builder.<span class="f">add_node</span>(<span class="s">"rag_bot"</span>, rag_bot)
+
+<span class="c"># 라우터가 돌려준 이름표를 실제 노드로 연결하는 '지도'</span>
+builder.<span class="f">add_conditional_edges</span>(START, route, {<span class="s">"chat"</span>: <span class="s">"chat_bot"</span>, <span class="s">"docs"</span>: <span class="s">"rag_bot"</span>})
+
+builder.<span class="f">add_edge</span>(<span class="s">"chat_bot"</span>, END)
+builder.<span class="f">add_edge</span>(<span class="s">"rag_bot"</span>, END)
+
+graph = builder.<span class="f">compile</span>(checkpointer=<span class="f">MemorySaver</span>())</pre>
+        <div class="note">⚠️ <b>라우터의 반환 문자열</b>과 <b>지도의 키</b>가 정확히 일치해야 합니다. 가장 흔한 실수입니다.</div>
+      </div>
+      <div class="foot"><span>15주차 · Part 5</span><span>17</span></div>
+    </section>
+
+    <!-- 18 -->
+    <section class="slide">
+      <div class="eyebrow">Part 5 · 실행 결과</div>
+      <h2>두 챗봇이 대화 기록을 공유한다</h2>
+      <div class="body">
+        <div class="chat" style="font-size:18px">
+          <div class="me">나 : 안녕! 내 이름은 김철수야.</div>
+          <div class="bot">봇 : 반갑습니다, 김철수님!<span class="via">chat_bot</span></div>
+          <div class="me">나 : 환불은 언제까지 가능해?</div>
+          <div class="bot">봇 : 개강일로부터 7일 이내에 신청하면 전액 환불됩니다.<span class="via a">rag_bot</span></div>
+          <div class="me">나 : 수료 조건도 알려줘</div>
+          <div class="bot">봇 : 전체 수업의 80% 이상 출석과 최종 프로젝트 제출입니다.<span class="via a">rag_bot</span></div>
+          <div class="me">나 : 내 이름 기억해?</div>
+          <div class="bot">봇 : 네, 김철수님이라고 하셨어요. ✅<span class="via">chat_bot</span></div>
+        </div>
+        <div class="note b">중간에 <b>RAG로 갔다 와도 이름을 기억</b>합니다 — 두 봇이 하나의 <code>messages</code>를 공유하기 때문입니다.</div>
+      </div>
+      <div class="foot"><span>15주차 · Part 5</span><span>18</span></div>
+    </section>
+
+    <!-- 19 -->
+    <section class="slide">
+      <div class="eyebrow">Part 5 · 6</div>
+      <h2>어느 길로 갔는지 확인하기</h2>
+      <div class="body">
+        <div class="cols">
+          <div>
+            <h3>실행 경로 — <code>stream</code></h3>
+            <pre class="sm"><span class="k">for</span> chunk <span class="k">in</span> graph.<span class="f">stream</span>(inp, config):
+    <span class="k">for</span> name, v <span class="k">in</span> chunk.<span class="f">items</span>():
+        <span class="f">print</span>(name)
+
+<span class="c"># [rag_bot] 결석 시 녹화 영상이…</span></pre>
+          </div>
+          <div>
+            <h3>구조 — <code>draw_mermaid</code></h3>
+            <pre class="sm"><span class="f">print</span>(graph.<span class="f">get_graph</span>().<span class="f">draw_mermaid</span>())
+
+<span class="c"># __start__ -.-&gt; chat_bot --&gt; __end__
+#           -.-&gt; rag_bot  --&gt; __end__</span></pre>
+          </div>
+        </div>
+        <div class="note">점선은 <b>조건 분기</b>, 실선은 <b>일반 엣지</b>. 출력을 mermaid.live에 붙이면 그림으로 볼 수 있습니다.</div>
+      </div>
+      <div class="foot"><span>15주차 · Part 5·6</span><span>19</span></div>
+    </section>
+
+    <!-- 20 -->
+    <section class="slide">
+      <div class="eyebrow">정리</div>
+      <h2>외울 것은 이 다섯 줄</h2>
+      <div class="body">
+        <pre class="sm"><span class="c"># ① 상태 = 대화 기록</span>
+<span class="k">class</span> <span class="f">State</span>(TypedDict):
+    messages: <span class="f">Annotated</span>[<span class="k">list</span>, add_messages]
+
+<span class="c"># ② 봇 = 함수 (messages 받아 messages 반환)</span>
+<span class="k">def</span> <span class="f">some_bot</span>(state):  <span class="k">return</span> {<span class="s">"messages"</span>: [llm.<span class="f">invoke</span>(state[<span class="s">"messages"</span>])]}
+
+<span class="c"># ③ 라우터 = 이름표 반환</span>
+<span class="k">def</span> <span class="f">route</span>(state):    <span class="k">return</span> <span class="s">"docs"</span> <span class="k">or</span> <span class="s">"chat"</span>
+
+<span class="c"># ④ 조립 + 기억</span>
+builder.<span class="f">add_conditional_edges</span>(START, route, {<span class="s">"chat"</span>: <span class="s">"chat_bot"</span>, <span class="s">"docs"</span>: <span class="s">"rag_bot"</span>})
+graph = builder.<span class="f">compile</span>(checkpointer=<span class="f">MemorySaver</span>())
+
+<span class="c"># ⑤ 실행 (thread_id 필수)</span>
+graph.<span class="f">invoke</span>({<span class="s">"messages"</span>: [...]}, {<span class="s">"configurable"</span>: {<span class="s">"thread_id"</span>: <span class="s">"user-1"</span>}})</pre>
+      </div>
+      <div class="foot"><span>15주차 · 정리</span><span>20</span></div>
+    </section>
+
+    <!-- 21 -->
+    <section class="slide">
+      <div class="eyebrow">트러블슈팅</div>
+      <h2>이런 에러가 나면</h2>
+      <div class="body">
+        <table style="font-size:16.5px">
+          <tr><th style="width:44%">증상</th><th>해결</th></tr>
+          <tr><td>앞 대화를 기억 못 함</td><td><code>compile(checkpointer=MemorySaver())</code> 확인</td></tr>
+          <tr><td>남의 대화가 섞임</td><td><code>thread_id</code>를 사용자마다 다르게</td></tr>
+          <tr><td>질문이 사라지고 답변만 남음</td><td><code>Annotated[list, add_messages]</code> 확인</td></tr>
+          <tr><td>항상 한쪽 봇으로만 감</td><td>라우터 반환값과 지도의 키가 같은지 확인</td></tr>
+          <tr><td><code>'list' object has no attribute 'strip'</code></td><td><code>.content</code> 대신 <code>.text</code> 사용</td></tr>
+          <tr><td><code>'dict' object has no attribute 'text'</code></td><td>노드 단독 테스트 시 <code>HumanMessage("...")</code> 로</td></tr>
+        </table>
+      </div>
+      <div class="foot"><span>15주차 · 트러블슈팅</span><span>21</span></div>
+    </section>
+
+    <!-- 22 -->
+    <section class="slide">
+      <div class="eyebrow">Part 7</div>
+      <h2>실습 과제</h2>
+      <div class="body">
+        <div class="kv"><span class="tag g">기본</span><p><b>세 번째 봇 추가</b> — "정리해줘"라고 하면 대화를 3줄로 요약하는 <code>summary_bot</code><br>
+          <span style="font-size:16px;color:var(--ink-3)">고칠 곳 3군데: 함수 작성 → 라우터 프롬프트에 선택지 추가 → 지도에 연결</span></p></div>
+        <div class="kv"><span class="tag b">응용</span><p><b>내 주제로 바꾸기</b> — <code>docs</code>를 동아리 규정·게임 공략 등으로 교체<br>
+          <span style="font-size:16px;color:var(--ink-3)">라우터 프롬프트의 docs 설명도 함께 고쳐야 분기가 맞습니다</span></p></div>
+        <div class="kv"><span class="tag a">도전</span><p><b>못 찾으면 넘기기</b> — RAG가 "찾을 수 없습니다"라고 하면 <code>chat_bot</code>으로 재시도<br>
+          <span style="font-size:16px;color:var(--ink-3)">힌트: rag_bot 뒤에 조건 엣지를 하나 더 — 14주차 루프와 같은 원리</span></p></div>
+      </div>
+      <div class="foot"><span>15주차 · 과제</span><span>22</span></div>
+    </section>
+
+    <!-- 23 -->
+    <section class="slide title-slide">
+      <div class="eyebrow">다음 시간</div>
+      <h1>에이전트</h1>
+      <p style="max-width:820px">오늘의 분기는 <strong style="color:#fff">우리가 미리 정해둔 두 길</strong> 중 하나를 고르는 방식이었습니다.<br>
+        다음은 LLM이 <strong style="color:#fff">어떤 도구를 쓸지 스스로 정하고, 필요하면 여러 번 반복</strong>하는 단계입니다.</p>
+      <div class="meta"><span class="pill">messages 상태</span><span class="pill">조건 분기</span><span class="pill">루프</span><span class="pill">＋ 도구(Tool)</span></div>
+      <p style="margin-top:26px;font-size:18px">오늘 만든 것이 그대로 재료가 됩니다. 수고하셨습니다 🎉</p>
+      <div class="foot"><span>15주차</span><span>23</span></div>
+    </section>
+
+    <div class="bar" id="bar"></div>
+  </div>
+</div>
+
+<div id="help">← → 이동 · F 전체화면 · P 인쇄(PDF)</div>
+
+<script>
+(function(){
+  var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var bar = document.getElementById('bar');
+  var help = document.getElementById('help');
+  var i = 0;
+
+  function show(n){
+    i = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach(function(s, k){ s.classList.toggle('on', k === i); });
+    bar.style.width = ((i + 1) / slides.length * 100) + '%';
+    if (location.hash !== '#' + (i + 1)) history.replaceState(null, '', '#' + (i + 1));
+  }
+  function next(){ show(i + 1); }
+  function prev(){ show(i - 1); }
+
+  document.addEventListener('keydown', function(e){
+    var k = e.key;
+    if (k === 'ArrowRight' || k === 'ArrowDown' || k === ' ' || k === 'PageDown'){ e.preventDefault(); next(); }
+    else if (k === 'ArrowLeft' || k === 'ArrowUp' || k === 'PageUp'){ e.preventDefault(); prev(); }
+    else if (k === 'Home'){ show(0); }
+    else if (k === 'End'){ show(slides.length - 1); }
+    else if (k === 'f' || k === 'F'){
+      if (document.fullscreenElement) document.exitFullscreen();
+      else document.documentElement.requestFullscreen();
+    }
+    else if (k === 'p' || k === 'P'){ window.print(); }
+  });
+
+  document.getElementById('viewport').addEventListener('click', function(e){
+    if (e.clientX < window.innerWidth * 0.25) prev(); else next();
+  });
+
+  var x0 = null;
+  document.addEventListener('touchstart', function(e){ x0 = e.touches[0].clientX; });
+  document.addEventListener('touchend', function(e){
+    if (x0 === null) return;
+    var dx = e.changedTouches[0].clientX - x0;
+    if (Math.abs(dx) > 50) (dx < 0 ? next() : prev());
+    x0 = null;
+  });
+
+  function fit(){
+    var s = Math.min(window.innerWidth / 1280, window.innerHeight / 720) * 0.96;
+    document.getElementById('stage').style.transform = 'scale(' + s + ')';
+  }
+  window.addEventListener('resize', fit);
+  fit();
+
+  var start = parseInt((location.hash || '#1').slice(1), 10);
+  show(isNaN(start) ? 0 : start - 1);
+
+  setTimeout(function(){ help.classList.add('hide'); }, 4000);
+})();
+</script>
+</body>
+</html>
