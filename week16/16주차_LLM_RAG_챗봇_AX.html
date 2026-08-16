@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>마지막 시간 · LLM · RAG · 챗봇 · AX</title>
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#100f16; --bg2:#17161f; --panel:#1b1a24;
+  --line:rgba(233,231,242,.10); --line2:rgba(233,231,242,.055);
+  --ink:#ece9f2; --muted:#a6a2b5; --dim:#6f6b7e;
+  --violet:#a78bfa; --violet-d:#7c5fd0;   /* LLM */
+  --cyan:#4fd1c5;   --cyan-d:#2fa79c;      /* RAG */
+  --amber:#f4b656;  --amber-d:#cf8f2e;     /* 챗봇설계 */
+  --green:#5fc48d;  --green-d:#3f9d6e;     /* AX */
+  --rose:#ec8a86;                          /* 경고 */
+  --radius:16px;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  --sans:'Pretendard','Pretendard Variable',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased}
+body{position:relative}
+
+#stage{
+  position:absolute;top:50%;left:50%;width:1280px;height:720px;
+  transform:translate(-50%,-50%);transform-origin:center center;
+  background:
+    radial-gradient(1200px 700px at 82% -12%, rgba(167,139,250,.10), transparent 60%),
+    radial-gradient(1000px 620px at -8% 110%, rgba(79,209,197,.07), transparent 62%),
+    var(--bg);
+  overflow:hidden;box-shadow:0 40px 120px rgba(0,0,0,.6);
+}
+.slide{
+  position:absolute;inset:0;padding:60px 76px 56px;
+  display:flex;flex-direction:column;
+  opacity:0;visibility:hidden;transform:translateY(14px);
+  transition:opacity .5s ease,transform .5s ease,visibility .5s;z-index:1;
+}
+.slide.active{opacity:1;visibility:visible;transform:none;z-index:2}
+@media (prefers-reduced-motion:reduce){.slide{transition:opacity .2s;transform:none}}
+
+/* shared */
+.eyebrow{font-family:var(--mono);font-size:13px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:var(--violet);display:flex;align-items:center;gap:12px}
+.eyebrow.cyan{color:var(--cyan)} .eyebrow.amber{color:var(--amber)} .eyebrow.green{color:var(--green)} .eyebrow.rose{color:var(--rose)}
+.eyebrow::before{content:"";width:26px;height:1px;background:currentColor;opacity:.6}
+.eyebrow .r{color:var(--dim);letter-spacing:.1em;margin-left:auto;font-weight:500}
+h1.title{font-size:42px;font-weight:800;line-height:1.15;letter-spacing:-.02em;margin-top:15px}
+h1.title .v{color:var(--violet)} h1.title .c{color:var(--cyan)} h1.title .am{color:var(--amber)} h1.title .gr{color:var(--green)} h1.title .ro{color:var(--rose)}
+.lead{font-size:19px;color:var(--muted);line-height:1.55;margin-top:13px;max-width:72ch}
+.lead b{color:var(--ink);font-weight:600}
+.body{flex:1;display:flex;min-height:0;margin-top:24px}
+.mono{font-family:var(--mono)}
+.foot{display:flex;align-items:center;gap:10px;color:var(--dim);font-family:var(--mono);font-size:12px;letter-spacing:.05em;margin-top:12px}
+
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px 22px;display:flex;flex-direction:column;justify-content:center}
+.card h3{font-size:15px;font-weight:700;margin-bottom:9px;display:flex;align-items:center;gap:9px}
+.card p{font-size:14.5px;color:var(--muted);line-height:1.55}
+.card p b{color:var(--ink);font-weight:600}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:22px;width:100%}
+.three{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;width:100%}
+.stack{display:flex;flex-direction:column;gap:14px;justify-content:center}
+.dot{width:7px;height:7px;border-radius:50%;background:currentColor;display:inline-block}
+.tag{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.04em;padding:5px 11px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+.tag.violet{color:var(--violet);border-color:rgba(167,139,250,.32);background:rgba(167,139,250,.09)}
+.tag.cyan{color:var(--cyan);border-color:rgba(79,209,197,.32);background:rgba(79,209,197,.09)}
+.tag.amber{color:var(--amber);border-color:rgba(244,182,86,.32);background:rgba(244,182,86,.09)}
+.tag.green{color:var(--green);border-color:rgba(95,196,141,.32);background:rgba(95,196,141,.09)}
+.tag.rose{color:var(--rose);border-color:rgba(236,138,134,.32);background:rgba(236,138,134,.09)}
+.note{font-size:14px;color:var(--dim);line-height:1.6;background:var(--bg2);border:1px solid var(--line2);border-radius:10px;padding:13px 17px}
+.note b{color:var(--violet)} .note .ic{margin-right:6px}
+
+/* ---- TITLE ---- */
+#s-title{justify-content:center;padding:0}
+#net{position:absolute;inset:0;z-index:1}
+#s-title::after{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;background:radial-gradient(760px 520px at 30% 52%, rgba(16,15,22,.82), rgba(16,15,22,.5) 46%, transparent 72%)}
+.title-wrap{position:relative;z-index:2;padding:0 78px}
+.kicker{font-family:var(--mono);font-size:15px;font-weight:600;letter-spacing:.28em;text-transform:uppercase;color:var(--violet);display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.kicker .s{color:var(--cyan)}.kicker .s2{color:var(--amber)}.kicker .s3{color:var(--green)}
+.kicker b{color:var(--dim);font-weight:500}
+#s-title h1{font-size:72px;font-weight:900;line-height:1.06;letter-spacing:-.035em;margin:20px 0 8px}
+#s-title h1 .hl{color:var(--violet)}
+.subtitle{font-size:21px;color:var(--muted);margin-top:18px;line-height:1.5;max-width:56ch}
+.subtitle b{color:var(--ink)}
+.title-meta{display:flex;gap:24px;margin-top:32px;font-family:var(--mono);font-size:13px;color:var(--dim);letter-spacing:.04em}
+.title-meta span b{color:var(--muted);font-weight:600}
+
+/* ---- DIVIDER ---- */
+.divider{justify-content:center;padding:0 90px}
+.divider .pnum{font-family:var(--mono);font-size:20px;font-weight:700;letter-spacing:.3em;color:var(--violet)}
+.divider h2{font-size:54px;font-weight:900;letter-spacing:-.03em;margin:14px 0 0;line-height:1.09}
+.divider .sub{font-size:19px;color:var(--muted);margin-top:16px;max-width:60ch}
+.divider .bar{width:60px;height:4px;background:var(--violet);border-radius:2px;margin-top:26px}
+
+/* domain cards (4 pillars) */
+.dgrid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:16px;width:100%}
+.dcard{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px 18px;display:flex;flex-direction:column;gap:9px;border-top:3px solid var(--violet)}
+.dcard.c{border-top-color:var(--cyan)} .dcard.am{border-top-color:var(--amber)} .dcard.gr{border-top-color:var(--green)}
+.dcard .ic{font-size:26px}
+.dcard .dn{font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--violet)}
+.dcard.c .dn{color:var(--cyan)} .dcard.am .dn{color:var(--amber)} .dcard.gr .dn{color:var(--green)}
+.dcard .dt{font-size:18px;font-weight:800;line-height:1.25}
+.dcard .dd{font-size:13.5px;color:var(--muted);line-height:1.5}
+.dcard .dd b{color:var(--ink)}
+.dcard .dwk{font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:auto;padding-top:6px}
+
+/* recap/next two-col within a domain */
+.rn{display:grid;grid-template-columns:1fr 1fr;gap:22px;width:100%}
+.rn .col{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 22px}
+.rn .col.now{border-left:3px solid var(--dim)}
+.rn .col.nxt{border-left:3px solid var(--violet)}
+.rn .lbl{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin-bottom:12px}
+.rn .col.nxt .lbl{color:var(--violet)}
+.rn ul{list-style:none;display:flex;flex-direction:column;gap:9px}
+.rn li{font-size:14.5px;color:var(--muted);line-height:1.45;padding-left:18px;position:relative}
+.rn li::before{content:"";position:absolute;left:0;top:8px;width:6px;height:6px;border-radius:50%;background:var(--dim)}
+.rn .col.nxt li::before{background:var(--violet)}
+.rn li b{color:var(--ink);font-weight:600}
+.rn li .mono{font-family:var(--mono);font-size:13px;color:var(--cyan)}
+
+/* numbered list */
+.nlist{display:flex;flex-direction:column;gap:11px;width:100%}
+.nrow{display:flex;gap:18px;align-items:flex-start;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 20px;border-left:3px solid var(--violet)}
+.nrow .nn{font-family:var(--mono);font-size:19px;font-weight:700;color:var(--violet);min-width:26px;line-height:1.2}
+.nrow .nc{flex:1}
+.nrow .nt{font-size:16.5px;font-weight:700;color:var(--ink);line-height:1.3}
+.nrow .nd{font-size:14px;color:var(--muted);line-height:1.5;margin-top:3px}
+.nrow .nd .mono{color:var(--cyan)}
+.nrow.cyan{border-left-color:var(--cyan)} .nrow.cyan .nn{color:var(--cyan)}
+.nrow.amber{border-left-color:var(--amber)} .nrow.amber .nn{color:var(--amber)}
+.nrow.green{border-left-color:var(--green)} .nrow.green .nn{color:var(--green)}
+.nrow.rose{border-left-color:var(--rose)} .nrow.rose .nn{color:var(--rose)}
+
+/* table */
+.tbl{width:100%;border-collapse:collapse;font-size:15px}
+.tbl th{font-family:var(--mono);font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--dim);text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);font-weight:600}
+.tbl td{padding:12px 14px;border-bottom:1px solid var(--line2);vertical-align:middle}
+.tbl tr:last-child td{border-bottom:none}
+.tbl .k{font-weight:700;color:var(--ink)}
+.tbl .m1{font-family:var(--mono);color:var(--violet);font-weight:600}
+.tbl .m2{font-family:var(--mono);color:var(--cyan);font-weight:600}
+.tbl .c-mut{color:var(--muted)}
+
+/* code-ish block */
+.block{background:#0b0a10;border:1px solid var(--line);border-radius:12px;padding:18px 22px;font-family:var(--mono);font-size:14.5px;line-height:1.7;color:var(--muted)}
+.block .q{color:var(--amber)} .block .hl{color:var(--ink);font-weight:600} .block .cy{color:var(--cyan)}
+
+/* flow / phases */
+.flow{display:flex;align-items:center;gap:10px;justify-content:center;flex-wrap:wrap;width:100%}
+.flow .fn{font-family:var(--sans);font-size:15.5px;font-weight:700;padding:11px 16px;border-radius:11px;border:1px solid var(--line);background:var(--panel);color:var(--ink);text-align:center;line-height:1.25}
+.flow .fn small{display:block;font-family:var(--mono);font-size:10.5px;font-weight:500;color:var(--dim);margin-top:3px;letter-spacing:.03em}
+.flow .fn.v{border-color:rgba(167,139,250,.4);color:var(--violet)} .flow .fn.v small{color:var(--violet-d)}
+.flow .fn.c{border-color:rgba(79,209,197,.4);color:var(--cyan)} .flow .fn.c small{color:var(--cyan-d)}
+.flow .fn.am{border-color:rgba(244,182,86,.4);color:var(--amber)} .flow .fn.am small{color:var(--amber-d)}
+.flow .fn.gr{border-color:rgba(95,196,141,.4);color:var(--green)} .flow .fn.gr small{color:var(--green-d)}
+.flow .ar{font-family:var(--mono);color:var(--dim);font-size:18px}
+
+/* portfolio components */
+.pcomp{display:grid;grid-template-columns:1fr 1fr;gap:12px 26px;width:100%}
+.pc{display:flex;gap:14px;align-items:flex-start}
+.pc .pn{font-family:var(--mono);font-weight:700;color:var(--violet);font-size:16px;min-width:22px}
+.pc .pt{font-size:15px;font-weight:700;color:var(--ink)}
+.pc .pd{font-size:13px;color:var(--muted);line-height:1.45}
+
+/* misconception */
+.miss{display:flex;flex-direction:column;gap:11px;width:100%}
+.mrow{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 20px;border-left:3px solid var(--rose)}
+.mrow .mq{font-size:15.5px;font-weight:700;color:var(--rose);display:flex;align-items:baseline;gap:9px}
+.mrow .mq .x{font-family:var(--mono)}
+.mrow .ma{font-size:13.5px;color:var(--muted);line-height:1.5;margin-top:5px;padding-left:22px}
+.mrow .ma b{color:var(--ink)}
+
+/* closing 3 keep */
+.three-keep{display:flex;flex-direction:column;gap:15px;width:100%}
+.keep{display:flex;gap:20px;align-items:flex-start;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:17px 24px;border-left:4px solid var(--violet)}
+.keep .kn{font-family:var(--mono);font-size:22px;font-weight:700;color:var(--bg);width:36px;height:36px;border-radius:10px;background:var(--violet);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.keep:nth-child(2) .kn{background:var(--cyan)} .keep:nth-child(2){border-left-color:var(--cyan)}
+.keep:nth-child(3) .kn{background:var(--green)} .keep:nth-child(3){border-left-color:var(--green)}
+.keep .kt{font-size:19px;font-weight:800;line-height:1.3}
+.keep .kd{font-size:14px;color:var(--muted);line-height:1.5;margin-top:4px}
+
+/* chrome */
+#progress{position:absolute;top:0;left:0;height:3px;background:linear-gradient(90deg,var(--violet),var(--cyan),var(--green));z-index:50;transition:width .4s ease;box-shadow:0 0 12px rgba(167,139,250,.4)}
+#hud{position:fixed;bottom:20px;right:24px;z-index:60;display:flex;align-items:center;gap:14px;font-family:var(--mono);font-size:12px;color:var(--dim)}
+#counter b{color:var(--ink)}
+.navbtn{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);background:rgba(23,22,31,.8);color:var(--muted);cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;transition:.18s;backdrop-filter:blur(6px)}
+.navbtn:hover{color:var(--ink);border-color:var(--violet);background:rgba(167,139,250,.12)}
+.navbtn:focus-visible{outline:2px solid var(--violet);outline-offset:2px}
+#kicker-tab{position:fixed;bottom:22px;left:26px;z-index:60;font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);display:flex;gap:10px;align-items:center}
+#kicker-tab .brand{color:var(--violet);font-weight:600}
+#hint{position:fixed;top:16px;right:24px;z-index:60;font-family:var(--mono);font-size:11px;color:var(--dim);opacity:.7;letter-spacing:.05em}
+.zone{position:absolute;top:0;height:100%;width:22%;z-index:40;cursor:pointer}
+.zone.l{left:0}.zone.r{right:0}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="progress"></div>
+
+  <!-- 01 TITLE -->
+  <section class="slide active" id="s-title">
+    <canvas id="net"></canvas>
+    <div class="title-wrap">
+      <div class="kicker">마지막 시간 <b>·</b> LLM <span class="s">RAG</span> <span class="s2">챗봇</span> <span class="s3">AX</span></div>
+      <h1>AI를 <span class="hl">만드는 사람</span>으로<br>나아가기</h1>
+      <p class="subtitle">RAG에서 시작해 에이전트까지 왔습니다.<br>이제 배운 것을 <b>하나의 지도</b>로 잇고, 다음 길을 정합니다.</p>
+      <div class="title-meta">
+        <span><b>강의</b> 1시간 + 질의응답</span>
+        <span><b>구성</b> 4부 · 지도 → 로드맵 → 프로젝트 → AX</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 02 오늘의 목적 -->
+  <section class="slide" id="s-purpose">
+    <div class="eyebrow">오늘의 목적 <span class="r">why this session</span></div>
+    <h1 class="title">배운 것과 <span class="v">만드는 것</span>은 다릅니다</h1>
+    <p class="lead">임베딩·RAG·에이전트를 배웠습니다. 오늘은 그 조각들을 <b>하나로 잇고</b>, 수료 이후 실제로 무엇을 할지 정하고 나갑니다.</p>
+    <div class="body">
+      <div class="flow" style="justify-content:flex-start">
+        <div class="fn v">① 네 영역의 지도<small>배운 것 정리</small></div>
+        <div class="ar">→</div>
+        <div class="fn c">② 학습 로드맵<small>다음에 뭘</small></div>
+        <div class="ar">→</div>
+        <div class="fn am">③ 프로젝트<small>어떻게 만드나</small></div>
+        <div class="ar">→</div>
+        <div class="fn gr">④ AX와 커리어<small>비즈니스로</small></div>
+      </div>
+    </div>
+    <div class="foot"><span>오늘 끝나면, 내일부터 무엇을 해야 할지 분명해집니다.</span></div>
+  </section>
+
+  <!-- 03 지금까지 온 길 -->
+  <section class="slide" id="s-journey">
+    <div class="eyebrow cyan">지금까지 온 길 <span class="r">where we are</span></div>
+    <h1 class="title">여기까지 <span class="c">벽돌을 쌓았습니다</span></h1>
+    <div class="body">
+      <div style="display:flex;flex-direction:column;gap:22px;width:100%;justify-content:center">
+        <div class="flow" style="justify-content:flex-start">
+          <div class="fn">기초<small>API · LangChain</small></div>
+          <div class="ar">→</div>
+          <div class="fn c">RAG<small>11~13주차</small></div>
+          <div class="ar">→</div>
+          <div class="fn am">에이전트<small>14~15주차</small></div>
+          <div class="ar">→</div>
+          <div class="fn v" style="border-style:dashed">지금 여기<small>종합 · 확장</small></div>
+        </div>
+        <div class="two" style="gap:14px 22px">
+          <div class="note" style="background:var(--panel)"><span class="ic" style="color:var(--cyan)">📚</span> <b style="color:var(--ink)">문서로 답하는 RAG 챗봇</b> — 검색해서 근거 있게 답하기</div>
+          <div class="note" style="background:var(--panel)"><span class="ic" style="color:var(--cyan)">🔍</span> <b style="color:var(--ink)">검색 품질 진단·개선</b> — 하이브리드·리랭킹·출처</div>
+          <div class="note" style="background:var(--panel)"><span class="ic" style="color:var(--amber)">🕸️</span> <b style="color:var(--ink)">도구 쓰는 에이전트</b> — 스스로 판단하고 실행</div>
+          <div class="note" style="background:var(--panel)"><span class="ic" style="color:var(--amber)">🔁</span> <b style="color:var(--ink)">기억·협업</b> — 멀티턴 + 멀티에이전트</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 04 PART 1 -->
+  <section class="slide divider" id="s-p1">
+    <div class="pnum">PART 1</div>
+    <h2>네 개의 기둥으로<br><span style="color:var(--violet)">지도를 그린다</span></h2>
+    <p class="sub">우리가 배운 것과 앞으로 갈 곳은, 네 영역으로 정리됩니다 — LLM · RAG · 챗봇 설계 · AX.</p>
+    <div class="bar"></div>
+  </section>
+
+  <!-- 05 네 영역 한눈에 -->
+  <section class="slide" id="s-fourpillars">
+    <div class="eyebrow">배운 것의 지도 <span class="r">the four pillars</span></div>
+    <h1 class="title">한눈에 보는 <span class="v">네 영역</span></h1>
+    <div class="body">
+      <div style="display:flex;flex-direction:column;gap:16px;width:100%;justify-content:center;height:100%">
+        <div class="dgrid">
+          <div class="dcard"><div class="ic">🧠</div><div class="dn">LLM</div><div class="dt">생각하는 엔진</div><div class="dd">언어를 이해·생성하는 모델. <b>프롬프트</b>로 부린다.</div><div class="dwk">전 과정의 토대</div></div>
+          <div class="dcard c"><div class="ic">📚</div><div class="dn">RAG</div><div class="dt">근거를 대는 법</div><div class="dd">내 문서에서 찾아 답하게. <b>환각을 줄인다.</b></div><div class="dwk">11~13주차</div></div>
+          <div class="dcard am"><div class="ic">💬</div><div class="dn">챗봇 설계</div><div class="dt">대화의 경험</div><div class="dd">기억·도구·협업으로 <b>쓸 만한 대화</b>를 만든다.</div><div class="dwk">14~15주차</div></div>
+          <div class="dcard gr"><div class="ic">🚀</div><div class="dn">AX</div><div class="dt">비즈니스로</div><div class="dd">업무·조직에 이식해 <b>실제로 바꾼다.</b></div><div class="dwk">다음 단계</div></div>
+        </div>
+        <div class="note" style="text-align:center;font-size:15px"><span class="ic">🧩</span> 이 넷은 <b style="color:var(--violet)">LLM</b>(엔진) → <b style="color:var(--cyan)">RAG</b>(근거) → <b style="color:var(--amber)">챗봇</b>(경험) → <b style="color:var(--green)">AX</b>(가치) 순서로 쌓입니다.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 06 LLM -->
+  <section class="slide" id="s-llm">
+    <div class="eyebrow">영역 1 · LLM <span class="r">the engine</span></div>
+    <h1 class="title"><span class="v">LLM</span> — 모든 것의 엔진</h1>
+    <p class="lead">언어 모델을 <b>어떻게 부리는지</b>가 시작입니다. 그 다음은 원리와 직접 운영으로.</p>
+    <div class="body">
+      <div class="rn">
+        <div class="col now">
+          <div class="lbl">배운 것</div>
+          <ul>
+            <li>LLM API 호출과 <b>프롬프트 엔지니어링</b></li>
+            <li><span class="mono">LCEL</span>로 체인 구성 · 출력 파싱</li>
+            <li>온도·시스템 프롬프트로 <b>행동 제어</b></li>
+          </ul>
+        </div>
+        <div class="col nxt">
+          <div class="lbl">다음 단계</div>
+          <ul>
+            <li>프롬프트 고도화 (few-shot · 구조화 출력)</li>
+            <li><b>파인튜닝</b> (LoRA/QLoRA) — 언제 필요한가</li>
+            <li>로컬 LLM (<span class="mono">Ollama</span>) · 멀티모달</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><span style="color:var(--muted)">첫걸음 — <b style="color:var(--violet)">"언제 파인튜닝, 언제 RAG?"</b>를 판단할 수 있게 되는 것.</span></div>
+  </section>
+
+  <!-- 06b 텍스트 처리 -->
+  <section class="slide" id="s-textprep">
+    <div class="eyebrow">기초 다지기 · 텍스트 처리 <span class="r">text processing</span></div>
+    <h1 class="title">컴퓨터가 <span class="v">글을 읽는 법</span></h1>
+    <p class="lead">컴퓨터는 글자를 모릅니다. 텍스트를 <b>잘게 쪼개고 숫자로</b> 바꾸는 것이 모든 것의 출발점입니다.</p>
+    <div class="body">
+      <div style="display:flex;flex-direction:column;gap:18px;width:100%;justify-content:center;height:100%">
+        <div class="flow" style="justify-content:flex-start">
+          <div class="fn">원문<small>"나는 밥을 먹었다"</small></div><div class="ar">→</div>
+          <div class="fn v">토큰화<small>tokenization</small></div><div class="ar">→</div>
+          <div class="fn">정제·정규화<small>불용어 처리</small></div><div class="ar">→</div>
+          <div class="fn c">숫자 ID<small>모델 입력</small></div>
+        </div>
+        <div class="three">
+          <div class="card"><h3>✂️ 토큰화</h3><p>문장을 <b>토큰</b>(단어·서브워드)으로 쪼갬. LLM은 토큰 단위로 읽고, <b>토큰이 곧 길이·비용</b>의 단위.</p></div>
+          <div class="card"><h3>🧹 전처리</h3><p>정제·정규화·불용어 제거로 <b>노이즈를 줄임</b>. 좋은 입력이 좋은 결과를 만듭니다.</p></div>
+          <div class="card"><h3>🇰🇷 한국어의 난관</h3><p>교착어라 <b>형태소 분석</b>이 필요('먹었다'→먹+었+다). 띄어쓰기도 까다롭습니다.</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 06c 텍스트 표현/임베딩 -->
+  <section class="slide" id="s-embed">
+    <div class="eyebrow cyan">기초 다지기 · 텍스트 표현 <span class="r">representation</span></div>
+    <h1 class="title">의미를 <span class="c">벡터로</span> 바꾸다</h1>
+    <p class="lead">단어를 숫자로 바꾸되, <b>뜻이 비슷하면 값도 가깝게</b> — 이것이 임베딩이고, RAG 검색의 핵심 재료입니다.</p>
+    <div class="body">
+      <div class="two" style="align-items:center;gap:26px">
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div class="nrow"><div class="nn">1</div><div class="nc"><div class="nt">BoW · TF-IDF</div><div class="nd">단어 <b>빈도</b> 기반. 단순하지만 <b>의미·순서를 못 담음</b>.</div></div></div>
+          <div class="nrow cyan"><div class="nn">2</div><div class="nc"><div class="nt">워드 임베딩 (Word2Vec)</div><div class="nd">의미를 벡터로. <b>가까운 뜻 = 가까운 벡터</b>.</div></div></div>
+          <div class="nrow cyan"><div class="nn">3</div><div class="nc"><div class="nt">문장·문서 임베딩</div><div class="nd">문장 전체를 벡터로 → <b>RAG 검색의 재료</b>.</div></div></div>
+        </div>
+        <div class="stack">
+          <div class="block" style="text-align:center;font-size:17px;line-height:1.8"><span class="hl">왕</span> − 남자 + 여자 ≈ <span class="cy">여왕</span><br><span style="color:var(--dim);font-size:13px;font-family:var(--sans)">의미가 벡터 연산으로 드러난다</span></div>
+          <div class="note"><span class="ic" style="color:var(--cyan)">🔗</span> <b style="color:var(--ink)">11주차 벡터 DB</b>가 바로 이 문장 임베딩을 저장하고 검색한 것입니다.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 06d 모델의 진화 -->
+  <section class="slide" id="s-evolution">
+    <div class="eyebrow">기초 다지기 · 모델의 진화 <span class="r">how we reached LLMs</span></div>
+    <h1 class="title">"다음 단어 맞히기"의 <span class="v">진화사</span></h1>
+    <div class="body">
+      <div class="nlist" style="justify-content:center">
+        <div class="nrow"><div class="nn">①</div><div class="nc"><div class="nt">통계 기반 (n-gram)</div><div class="nd">앞 몇 단어로 다음을 예측. <b>긴 문맥을 못 봅니다</b>.</div></div></div>
+        <div class="nrow"><div class="nn">②</div><div class="nc"><div class="nt">RNN · LSTM</div><div class="nd">순서대로 기억하며 처리. <b>멀리 있는 건 잊고, 느립니다</b>.</div></div></div>
+        <div class="nrow amber"><div class="nn">③</div><div class="nc"><div class="nt">어텐션 (Attention)</div><div class="nd">"중요한 곳에 집중" — 문맥을 <b>멀리까지 한 번에</b> 봅니다.</div></div></div>
+        <div class="nrow green"><div class="nn">④</div><div class="nc"><div class="nt">Transformer (2017)</div><div class="nd">어텐션만으로. <b>병렬 처리 + 긴 문맥</b> → 오늘날 LLM의 기반.</div></div></div>
+      </div>
+    </div>
+    <div class="foot"><span style="color:var(--muted)">핵심 전환 — <b style="color:var(--green)">Transformer</b>가 "크게 키울수록 똑똑해지는" 길을 열었습니다.</span></div>
+  </section>
+
+  <!-- 06e LLM 작동 원리 -->
+  <section class="slide" id="s-howllm">
+    <div class="eyebrow">기초 다지기 · LLM 원리 <span class="r">how LLMs work</span></div>
+    <h1 class="title">LLM은 거대한 <span class="v">다음-토큰 예측기</span></h1>
+    <p class="lead">방대한 텍스트로 <b>사전학습</b>한 Transformer가, 다음에 올 토큰을 <b>확률로</b> 고릅니다.</p>
+    <div class="body">
+      <div class="two" style="align-items:center;gap:26px">
+        <div class="block" style="font-size:15px;line-height:1.9">입력: <span class="hl">"나는 밥을"</span><br><br>다음 토큰 확률 →<br>&nbsp;&nbsp;<span class="cy">먹었다</span>&nbsp;&nbsp;████████&nbsp;0.72<br>&nbsp;&nbsp;샀다&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;██&nbsp;0.11<br>&nbsp;&nbsp;봤다&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;█&nbsp;0.05<br><br><span style="color:var(--dim);font-size:13px;font-family:var(--sans)">가장 그럴듯한 토큰을 이어붙인다</span></div>
+        <div class="stack" style="gap:11px">
+          <div class="card"><h3>📚 사전학습 + 정렬</h3><p>거대 데이터로 학습 후, <b>파인튜닝·RLHF</b>로 대화에 맞게 다듬음.</p></div>
+          <div class="card"><h3>🪟 컨텍스트 윈도우</h3><p>한 번에 볼 수 있는 <b>토큰 수의 한계</b>. 프롬프트+대화가 여기에 들어감.</p></div>
+          <div class="card" style="border-left:3px solid var(--rose)"><h3><span style="color:var(--rose)">⚠️ 환각의 근원</span></h3><p>'사실'이 아니라 <b>'그럴듯한 다음 토큰'</b>을 생성 → 그래서 <b style="color:var(--cyan)">RAG</b>가 필요.</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 07 RAG -->
+  <section class="slide" id="s-rag">
+    <div class="eyebrow cyan">영역 2 · RAG <span class="r">grounding</span></div>
+    <h1 class="title"><span class="c">RAG</span> — 근거 있게 답하기</h1>
+    <p class="lead">LLM에 <b>내 문서</b>를 물려, 지어내지 않고 찾아서 답하게 만드는 기술입니다.</p>
+    <div class="body">
+      <div class="rn">
+        <div class="col now" style="border-left-color:var(--cyan-d)">
+          <div class="lbl">배운 것 · 11~13주차</div>
+          <ul>
+            <li>임베딩 · <b>벡터 DB</b>로 의미 검색</li>
+            <li>RAG 파이프라인 (검색→증강→생성)</li>
+            <li>고도화 — <b>하이브리드 검색·리랭킹·출처 표시</b></li>
+          </ul>
+        </div>
+        <div class="col nxt" style="border-left-color:var(--cyan)">
+          <div class="lbl" style="color:var(--cyan)">다음 단계</div>
+          <ul style="--b:var(--cyan)">
+            <li><b>평가(RAGAS)</b> — 정확도·환각을 숫자로</li>
+            <li>고급 검색 — 쿼리 변환 · HyDE</li>
+            <li><b>GraphRAG</b> · 멀티모달 RAG</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><span style="color:var(--muted)">첫걸음 — <b style="color:var(--cyan)">RAGAS로 내 RAG에 점수를 매기기.</b> 측정 없이 개선은 없습니다.</span></div>
+  </section>
+
+  <!-- 08 챗봇 설계 -->
+  <section class="slide" id="s-chatbot">
+    <div class="eyebrow amber">영역 3 · 챗봇 설계 <span class="r">experience</span></div>
+    <h1 class="title"><span class="am">챗봇 설계</span> — 쓸 만한 대화 만들기</h1>
+    <p class="lead">한 번 답하고 끝이 아니라, <b>기억하고 · 도구를 쓰고 · 협업하는</b> 시스템으로.</p>
+    <div class="body">
+      <div class="rn">
+        <div class="col now" style="border-left-color:var(--amber-d)">
+          <div class="lbl">배운 것 · 14~15주차</div>
+          <ul>
+            <li><span class="mono" style="color:var(--amber)">LangGraph</span> · 에이전트 루프(분기+반복)</li>
+            <li><b>멀티턴</b> — 대화를 기억(Checkpointer)</li>
+            <li><b>멀티에이전트</b> — 역할 분담(Supervisor)</li>
+          </ul>
+        </div>
+        <div class="col nxt" style="border-left-color:var(--amber)">
+          <div class="lbl" style="color:var(--amber)">다음 단계</div>
+          <ul>
+            <li>대화 UX · <b>사람 개입</b>(human-in-the-loop)</li>
+            <li>도구 확장 · <span class="mono" style="color:var(--amber)">MCP</span> 연동</li>
+            <li>관찰·디버깅 (<b>LangSmith</b>)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><span style="color:var(--muted)">핵심 — 대화는 <b style="color:var(--ink)">시간축(기억)</b> + <b style="color:var(--ink)">역할축(협업)</b>의 두 축으로 설계합니다.</span></div>
+  </section>
+
+  <!-- 09 AX -->
+  <section class="slide" id="s-ax">
+    <div class="eyebrow green">영역 4 · AX <span class="r">AI transformation</span></div>
+    <h1 class="title"><span class="gr">AX</span> — 챗봇을 넘어, 조직을 바꾸다</h1>
+    <p class="lead"><b>AX(AI Transformation)</b>는 챗봇 하나를 만드는 일이 아니라, 업무·프로세스·조직에 AI를 이식해 <b>일하는 방식을 근본적으로 바꾸는</b> 일입니다.</p>
+    <div class="body">
+      <div class="three">
+        <div class="card" style="border-top:3px solid var(--green)">
+          <h3>무엇인가</h3>
+          <p>흩어진 지식과 반복 업무를 <b>AI가 흐르는 구조</b>로 재설계. 도구 도입이 아니라 <b>일의 재편</b>입니다.</p>
+        </div>
+        <div class="card" style="border-top:3px solid var(--green)">
+          <h3>왜 중요한가</h3>
+          <p>기업의 최대 화두. <b>"도구를 아는 사람"</b>보다 <b style="color:var(--green)">"도구로 조직을 바꾸는 사람"</b>이 훨씬 귀합니다.</p>
+        </div>
+        <div class="card" style="border-top:3px solid var(--green)">
+          <h3>여러분의 위치</h3>
+          <p>RAG·에이전트는 <b>AX의 기술 재료</b>입니다. 여러분은 이미 그 재료를 손에 쥐었습니다.</p>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><span style="color:var(--muted)">RAG·챗봇이 <b style="color:var(--ink)">'무엇을 만들 수 있나'</b>라면, AX는 <b style="color:var(--green)">'그래서 무엇을 바꾸나'</b>입니다.</span></div>
+  </section>
+
+  <!-- 10 PART 2 -->
+  <section class="slide divider" id="s-p2">
+    <div class="pnum">PART 2</div>
+    <h2>앞으로 무엇을<br><span style="color:var(--violet)">공부할 것인가</span></h2>
+    <p class="sub">전부 다 할 필요는 없습니다. 네 영역 중 <b style="color:var(--ink)">목표에 맞는 길</b>을 깊게 파세요.</p>
+    <div class="bar"></div>
+  </section>
+
+  <!-- 11 심화 로드맵 -->
+  <section class="slide" id="s-roadmap">
+    <div class="eyebrow">영역별 심화 로드맵 <span class="r">what's next</span></div>
+    <h1 class="title">네 영역, <span class="v">다음에 배울 것</span></h1>
+    <div class="body">
+      <table class="tbl">
+        <thead><tr><th>영역</th><th>다음에 배울 것</th><th>첫걸음</th></tr></thead>
+        <tbody>
+          <tr><td class="k" style="color:var(--violet)">LLM</td><td class="c-mut">파인튜닝(LoRA) · 로컬 LLM · 멀티모달</td><td class="m1">Ollama로 오픈모델 돌리기</td></tr>
+          <tr><td class="k" style="color:var(--cyan)">RAG</td><td class="c-mut">평가(RAGAS) · GraphRAG · 고급 검색</td><td class="m2">RAGAS로 점수 매기기</td></tr>
+          <tr><td class="k" style="color:var(--amber)">챗봇 설계</td><td class="c-mut">고급 LangGraph(HITL) · MCP · 관찰</td><td class="m1" style="color:var(--amber)">LangSmith 연결</td></tr>
+          <tr><td class="k" style="color:var(--green)">프로덕션 · AX</td><td class="c-mut">배포(FastAPI) · LLMOps · 조직 도입</td><td class="m1" style="color:var(--green)">Streamlit으로 배포</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="foot"><span style="color:var(--muted)">한 줄씩 정복하지 말고, <b style="color:var(--ink)">한 영역을 골라 첫걸음부터</b> 떼세요.</span></div>
+  </section>
+
+  <!-- 12 목표별 우선순위 -->
+  <section class="slide" id="s-priority">
+    <div class="eyebrow cyan">목표별 우선순위 <span class="r">where to start</span></div>
+    <h1 class="title">목표에 따라 <span class="c">순서가 다릅니다</span></h1>
+    <div class="body">
+      <table class="tbl">
+        <thead><tr><th>목표</th><th>1순위</th><th>2순위</th></tr></thead>
+        <tbody>
+          <tr><td class="k">취업 · 이직</td><td class="m1" style="color:var(--green)">프로덕션 (배포된 포트폴리오)</td><td class="c-mut">RAG / 챗봇 심화</td></tr>
+          <tr><td class="k">서비스 · 창업</td><td class="m1" style="color:var(--green)">프로덕션 + 안전(가드레일)</td><td class="c-mut">RAG 심화 · 비용 최적화</td></tr>
+          <tr><td class="k">AX 컨설팅</td><td class="m1" style="color:var(--green)">AX 도입 방법론 + 프로덕션</td><td class="c-mut">도메인 이해</td></tr>
+          <tr><td class="k">연구 · 대학원</td><td class="m1" style="color:var(--violet)">모델 기초 · 이론</td><td class="c-mut">평가 · 측정</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="foot"><span style="color:var(--muted)">공통 진리 — <b style="color:var(--ink)">하나라도 끝까지 만들어 배포한 경험</b>이 열 개의 튜토리얼을 이깁니다.</span></div>
+  </section>
+
+  <!-- 13 계속 공부하는 법 -->
+  <section class="slide" id="s-keeplearning">
+    <div class="eyebrow">계속 공부하는 법 <span class="r">stay current</span></div>
+    <h1 class="title">완강이 <span class="v">끝이 아닌</span> 이유</h1>
+    <p class="lead">이 분야는 <b>매달 바뀝니다.</b> 그래서 "배우는 습관"이 지식보다 중요합니다.</p>
+    <div class="body">
+      <div class="two" style="gap:16px 22px">
+        <div class="card"><h3>📄 공식 문서</h3><p>LangChain·LangGraph 문서가 가장 정확·최신. <b>모델·API는 자주 deprecated</b> 되니 늘 확인.</p></div>
+        <div class="card"><h3>🔨 직접 만들기</h3><p>읽기만 하면 잊습니다. <b>작은 걸 계속</b> 만드세요.</p></div>
+        <div class="card"><h3>🌐 커뮤니티 · 뉴스레터</h3><p>흐름을 놓치지 않게 한두 개는 구독.</p></div>
+        <div class="card"><h3>📑 논문 훑기</h3><p>깊이 가려면. <b>초록·그림</b>만 봐도 감이 옵니다.</p></div>
+      </div>
+    </div>
+    <div class="foot"><span style="color:var(--muted)">새 기법이 나오면 물으세요 — <b style="color:var(--ink)">"이건 내가 아는 것 중 무엇의 개선인가?"</b></span></div>
+  </section>
+
+  <!-- 14 PART 3 -->
+  <section class="slide divider" id="s-p3">
+    <div class="pnum">PART 3</div>
+    <h2>프로젝트를<br><span style="color:var(--violet)">어떻게 해나갈까</span></h2>
+    <p class="sub">배운 조각을 하나로 잇는 가장 확실한 방법 — 나만의 프로젝트를 <b style="color:var(--ink)">끝까지</b> 만드는 것.</p>
+    <div class="bar"></div>
+  </section>
+
+  <!-- 15 왜 프로젝트인가 -->
+  <section class="slide" id="s-whyproject">
+    <div class="eyebrow amber">왜 프로젝트인가 <span class="r">why build</span></div>
+    <h1 class="title">따라 치는 것과 <span class="am">스스로 만드는 것</span></h1>
+    <p class="lead">튜토리얼을 따라 치면 "이해했다"고 착각하기 쉽습니다. <b>빈 화면에서 만들어 봐야</b> 진짜 실력이 됩니다.</p>
+    <div class="body">
+      <div class="three">
+        <div class="card"><h3>🧩 조각이 연결된다</h3><p>LLM·RAG·에이전트가 <b>하나의 흐름</b>으로 이어집니다.</p></div>
+        <div class="card"><h3>🔥 진짜 문제를 만난다</h3><p>지저분한 데이터·엉뚱한 답 — 튜토리얼에 없던 문제로 <b>성장</b>합니다.</p></div>
+        <div class="card"><h3>🏆 포트폴리오가 된다</h3><p>말보다 <b>"이거 제가 만들었어요"</b>가 강력합니다.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 16 주제 정하기 -->
+  <section class="slide" id="s-topic">
+    <div class="eyebrow amber">1단계 · 주제 정하기 <span class="r">pick a project</span></div>
+    <h1 class="title">무엇을 만들까 — <span class="am">난이도별 아이디어</span></h1>
+    <div class="body">
+      <table class="tbl">
+        <thead><tr><th>난이도</th><th>아이디어</th><th>쓰는 기술</th></tr></thead>
+        <tbody>
+          <tr><td class="k" style="color:var(--green)">입문</td><td>내 문서 Q&amp;A 봇 (관심 분야 PDF 몇 개)</td><td class="m2">RAG · 11~13주차</td></tr>
+          <tr><td class="k" style="color:var(--cyan)">중급</td><td>사내·팀 지식 챗봇 (<b style="color:var(--ink)">출처 표시</b> 포함)</td><td class="m2">RAG 고도화 · 13주차</td></tr>
+          <tr><td class="k" style="color:var(--amber)">중급+</td><td>다기능 상담 에이전트 (조회+계산+검색)</td><td class="m1" style="color:var(--amber)">에이전트 · 14~15주차</td></tr>
+          <tr><td class="k" style="color:var(--rose)">심화</td><td><b style="color:var(--ink)">AX 업무 자동화</b> + 웹 배포</td><td class="m1" style="color:var(--green)">멀티에이전트 + 프로덕션</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="foot"><span style="color:var(--muted)">좋은 주제의 3조건 — <b style="color:var(--ink)">① 관심 도메인 · ② 데이터 확보 가능 · ③ 적정 범위.</b> 고민되면 "내 문서 Q&amp;A 봇"부터.</span></div>
+  </section>
+
+  <!-- 17 MVP -->
+  <section class="slide" id="s-mvp">
+    <div class="eyebrow amber">2단계 · 범위 좁히기 <span class="r">start small</span></div>
+    <h1 class="title">처음부터 크게? <span class="ro">그럼 못 끝냅니다</span></h1>
+    <div class="body">
+      <div style="display:flex;flex-direction:column;gap:18px;width:100%;justify-content:center">
+        <div class="two">
+          <div class="card" style="border-left:3px solid var(--rose)"><h3><span style="color:var(--rose)">✗ 이렇게 시작하면</span></h3><p>"모든 걸 갖춘 완벽한 AI 비서" → <b>몇 달째 미완성</b></p></div>
+          <div class="card" style="border-left:3px solid var(--green)"><h3><span style="color:var(--green)">✓ 이렇게 시작하세요</span></h3><p>"PDF 3개로 답하는 챗봇" → <b>이번 주 완성</b> → 확장</p></div>
+        </div>
+        <div class="flow" style="justify-content:flex-start">
+          <div class="fn c">MVP<small>일단 된다</small></div><div class="ar">+</div>
+          <div class="fn">화면(Streamlit)</div><div class="ar">+</div>
+          <div class="fn">출처 표시</div><div class="ar">+</div>
+          <div class="fn am">기억(멀티턴)</div><div class="ar">+</div>
+          <div class="fn am">도구(에이전트)</div><div class="ar">+</div>
+          <div class="fn gr">배포</div>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><span style="color:var(--muted)">먼저 <b style="color:var(--ink)">끝까지 도는 가장 작은 버전</b>을 완성하고, 위에 하나씩 얹으세요.</span></div>
+  </section>
+
+  <!-- 18 조립 순서 -->
+  <section class="slide" id="s-assemble">
+    <div class="eyebrow cyan">3단계 · 조립 순서 <span class="r">build order</span></div>
+    <h1 class="title">배운 순서 <span class="c">그대로 쌓으면</span> 됩니다</h1>
+    <div class="body">
+      <div class="two" style="align-items:center;gap:26px">
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div class="flow" style="justify-content:flex-start;gap:8px">
+            <div class="fn">1 · 문서 준비</div><div class="ar">→</div>
+            <div class="fn c">2 · RAG<small>11~13</small></div><div class="ar">→</div>
+            <div class="fn am">3 · 에이전트화<small>14~15</small></div>
+          </div>
+          <div class="flow" style="justify-content:flex-start;gap:8px">
+            <div class="fn">4 · UI<small>Streamlit</small></div><div class="ar">→</div>
+            <div class="fn">5 · 평가<small>13주차 교훈</small></div><div class="ar">→</div>
+            <div class="fn gr">6 · 배포</div>
+          </div>
+        </div>
+        <div class="block">my-ai-project/<br>├── <span class="hl">data/</span>        <span class="cy"># 문서 (1)</span><br>├── <span class="hl">ingest.py</span>    <span class="cy"># 문서→벡터DB (2)</span><br>├── <span class="hl">rag.py</span>       <span class="cy"># 체인·에이전트 (2~3)</span><br>├── <span class="hl">app.py</span>       <span class="cy"># Streamlit UI (4)</span><br>├── <span class="hl">eval.py</span>      <span class="cy"># 평가 (5)</span><br>└── <span class="hl">README.md</span>    <span class="cy"># 포트폴리오</span></div>
+      </div>
+    </div>
+    <div class="foot"><span style="color:var(--muted)">각 단계 = <b style="color:var(--ink)">이미 배운 노트북</b>. 새로 배우는 게 아니라 <b style="color:var(--ink)">내 데이터로 바꿔 조립</b>하는 것.</span></div>
+  </section>
+
+  <!-- 19 원칙 & 함정 -->
+  <section class="slide" id="s-principles">
+    <div class="eyebrow">개발 원칙 &amp; 함정 <span class="r">do &amp; don't</span></div>
+    <h1 class="title">지킬 <span class="gr">원칙</span>, 피할 <span class="ro">함정</span></h1>
+    <div class="body">
+      <div class="two">
+        <div class="card" style="border-top:3px solid var(--green)">
+          <h3><span style="color:var(--green)">✓ 지킬 원칙</span></h3>
+          <p style="line-height:1.95">· <b>작동하는 걸 먼저</b> — 못생겨도 일단 돌게<br>· <b>한 번에 하나씩</b> — 넣고 확인, 또 넣고 확인<br>· <b>측정하며 개선</b> — 느낌 말고 결과로 (13주차)<br>· <b>버전 관리(Git)</b> — 되돌아갈 수 있게</p>
+        </div>
+        <div class="card" style="border-top:3px solid var(--rose)">
+          <h3><span style="color:var(--rose)">✗ 피할 함정</span></h3>
+          <p style="line-height:1.95">· <b>범위 과욕</b> → MVP로 쪼개기<br>· <b>완벽주의</b> → "일단 되게" 먼저<br>· <b>측정 없는 튜닝</b> → 평가셋 만들기<br>· <b>배포 미루기</b> → 배포까지가 프로젝트</p>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><span style="color:var(--muted)">⚠ <b style="color:var(--ink)">배포하지 않은 프로젝트는 없는 프로젝트</b>나 마찬가지 — 링크 하나로 보여줄 수 있어야 합니다.</span></div>
+  </section>
+
+  <!-- 20 PART 4 -->
+  <section class="slide divider" id="s-p4">
+    <div class="pnum">PART 4</div>
+    <h2>AX와 커리어,<br><span style="color:var(--green)">그리고 원칙</span></h2>
+    <p class="sub">배운 기술이 시장에서 어떤 기회가 되는지, 그리고 실무에서 조심할 것.</p>
+    <div class="bar" style="background:var(--green)"></div>
+  </section>
+
+  <!-- 21 AX 기회 -->
+  <section class="slide" id="s-opportunity">
+    <div class="eyebrow green">AX와 시장 <span class="r">the opportunity</span></div>
+    <h1 class="title">시장은 <span class="gr">이 능력</span>을 찾고 있습니다</h1>
+    <div class="body">
+      <div class="two" style="gap:16px 22px">
+        <div class="card"><h3>📈 수요 급증</h3><p>LLM·RAG 채용공고가 빠르게 늘고 있습니다. 도구를 다루는 사람이 <b>절대적으로 부족</b>합니다.</p></div>
+        <div class="card"><h3>💎 경험이 프리미엄</h3><p><b>LangChain·RAG 구축 경험</b>은 신입에게도 강력한 무기 — 여러분이 이번에 쌓은 것입니다.</p></div>
+        <div class="card"><h3>🤝 기업의 의지</h3><p>많은 채용 담당자가 <b>AI 활용 역량자에게 추가 보상</b>을 줄 의향이 있다고 답합니다.</p></div>
+        <div class="card" style="border-top:3px solid var(--green)"><h3><span style="color:var(--green)">🚀 AX 인재는 희소</span></h3><p>기술을 <b>조직 변화</b>로 잇는 사람은 특히 드뭅니다. 가장 큰 기회가 여기 있습니다.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 22 채용 매핑 -->
+  <section class="slide" id="s-mapping">
+    <div class="eyebrow green">배운 것 → 채용 요구 <span class="r">you already have half</span></div>
+    <h1 class="title">공고 요구의 <span class="gr">절반은 이미</span> 채웠습니다</h1>
+    <div class="body">
+      <div class="two" style="align-items:center;gap:26px">
+        <table class="tbl">
+          <thead><tr><th>채용공고가 원하는 것</th><th>상태</th></tr></thead>
+          <tbody>
+            <tr><td class="k">LangChain · LangGraph</td><td class="m2">✅ 갖춤</td></tr>
+            <tr><td class="k">RAG 파이프라인</td><td class="m2">✅ 갖춤</td></tr>
+            <tr><td class="k">벡터DB · 임베딩</td><td class="m2">✅ 갖춤</td></tr>
+            <tr><td class="k">프롬프트 엔지니어링</td><td class="m2">✅ 갖춤</td></tr>
+            <tr><td class="k">API화 · 클라우드 배포</td><td class="c-mut" style="color:var(--rose)">⚠ 보강</td></tr>
+            <tr><td class="k">파인튜닝</td><td class="c-mut">🔵 선택</td></tr>
+          </tbody>
+        </table>
+        <div class="card" style="background:rgba(95,196,141,.06);border-color:rgba(95,196,141,.28)">
+          <h3 style="font-size:17px"><span style="color:var(--green)">남은 건 하나</span></h3>
+          <p style="font-size:15px;margin-top:6px"><b>배포까지 해서 링크로 보여주기.</b> 여기서 합격이 갈립니다.</p>
+          <p style="font-size:14px;margin-top:12px;color:var(--dim)">FastAPI로 API화 → Streamlit·클라우드로 배포. Part 3의 조립 순서 그대로입니다.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 23 실무 오해 -->
+  <section class="slide" id="s-myths">
+    <div class="eyebrow rose">실무에서 조심할 것 <span class="r">common myths</span></div>
+    <h1 class="title">이렇게 <span class="ro">착각하기 쉽습니다</span></h1>
+    <div class="body">
+      <div class="miss">
+        <div class="mrow"><div class="mq"><span class="x">01</span> "LLM은 다 안다"</div><div class="ma">모르는 건 <b>그럴듯하게 지어냅니다</b>(환각). 그래서 <b>RAG</b>로 근거를 대야 합니다.</div></div>
+        <div class="mrow"><div class="mq"><span class="x">02</span> "RAG를 쓰면 환각이 없다"</div><div class="ma">검색이 틀리면 답도 틀립니다. <b>평가와 출처 표시</b>가 함께 가야 합니다.</div></div>
+        <div class="mrow"><div class="mq"><span class="x">03</span> "복잡한 에이전트가 좋다"</div><div class="ma">복잡할수록 느리고 예측이 어렵습니다. <b>단순한 것부터, 필요할 때만</b> 에이전트.</div></div>
+        <div class="mrow"><div class="mq"><span class="x">04</span> "파인튜닝이 정답이다"</div><div class="ma">대부분 <b>RAG·프롬프트로 충분</b>합니다. 파인튜닝은 근거를 갖춘 최후의 선택.</div></div>
+        <div class="mrow"><div class="mq"><span class="x">05</span> "데모가 곧 완성이다"</div><div class="ma"><b>배포·평가·안전(가드레일)</b>까지 가야 진짜 프로덕션입니다.</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 24 마무리 -->
+  <section class="slide" id="s-closing">
+    <div class="eyebrow green">마치며 <span class="r">the end</span></div>
+    <h1 class="title">딱 <span class="gr">세 가지만</span> 기억하세요</h1>
+    <div class="body">
+      <div class="three-keep">
+        <div class="keep"><div class="kn">1</div><div><div class="kt">네 영역 중 하나를 깊게</div><div class="kd">LLM · RAG · 챗봇 · AX — 다 하려 말고, 목표에 맞는 한 갈래를 파세요.</div></div></div>
+        <div class="keep"><div class="kn">2</div><div><div class="kt">작게 만들어 배포까지</div><div class="kd">완벽한 큰 것보다, 끝까지 가서 배포한 작은 것이 무기가 됩니다.</div></div></div>
+        <div class="keep"><div class="kn">3</div><div><div class="kt">만들고 → 배포하고 → 보여주기</div><div class="kd">읽지만 말고 만드세요. 링크 하나가 백 마디 말을 이깁니다.</div></div></div>
+      </div>
+    </div>
+    <div class="foot" style="justify-content:center;font-size:14.5px"><span style="color:var(--green)">RAG에서 시작해 AX까지 왔습니다. 이제 여러분이 조직을 바꿀 차례입니다. 🚀</span></div>
+  </section>
+
+</div>
+
+<div id="kicker-tab"><span class="brand">데이리터</span> · LLM · RAG · 챗봇 · AX</div>
+<div id="hint">← → 이동 · F 전체화면</div>
+<div id="hud">
+  <button class="navbtn" id="prev" aria-label="이전 슬라이드">‹</button>
+  <span id="counter"><b>01</b> / 28</span>
+  <button class="navbtn" id="next" aria-label="다음 슬라이드">›</button>
+</div>
+<div class="zone l" id="zl" aria-hidden="true"></div>
+<div class="zone r" id="zr" aria-hidden="true"></div>
+
+<script>
+(function(){
+  var stage=document.getElementById('stage');
+  var slides=Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var total=slides.length,i=0;
+  var counter=document.getElementById('counter'), prog=document.getElementById('progress');
+  function fit(){var s=Math.min(window.innerWidth/1280,window.innerHeight/720);stage.style.transform='translate(-50%,-50%) scale('+s+')';}
+  function pad(n){return (n<10?'0':'')+n;}
+  function show(n){
+    i=Math.max(0,Math.min(total-1,n));
+    slides.forEach(function(s,k){s.classList.toggle('active',k===i);});
+    counter.innerHTML='<b>'+pad(i+1)+'</b> / '+pad(total);
+    prog.style.width=((i)/(total-1)*100)+'%';
+    if(i===0) startNet();
+  }
+  function next(){show(i+1);} function prev(){show(i-1);}
+  document.getElementById('next').onclick=next;
+  document.getElementById('prev').onclick=prev;
+  document.getElementById('zr').onclick=next;
+  document.getElementById('zl').onclick=prev;
+  document.addEventListener('keydown',function(e){
+    if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown'){e.preventDefault();next();}
+    else if(e.key==='ArrowLeft'||e.key==='PageUp'){e.preventDefault();prev();}
+    else if(e.key==='Home'){show(0);} else if(e.key==='End'){show(total-1);}
+    else if(e.key==='f'||e.key==='F'){ if(!document.fullscreenElement){document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen();} else {document.exitFullscreen&&document.exitFullscreen();} }
+  });
+  window.addEventListener('resize',fit);
+
+  var started=false;
+  function startNet(){
+    if(started) return; started=true;
+    var cv=document.getElementById('net'); if(!cv) return;
+    var ctx=cv.getContext('2d');
+    var reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+    cv.width=1280; cv.height=720;
+    var cols=['167,139,250','79,209,197','244,182,86','95,196,141'];
+    var N=30, nodes=[];
+    for(var k=0;k<N;k++){
+      nodes.push({x:Math.random()*1280,y:Math.random()*720,
+        vx:(Math.random()-0.5)*.28, vy:(Math.random()-0.5)*.28,
+        r:Math.random()*2.4+1.6, c:cols[k%4], ph:Math.random()*6.28});
+    }
+    var D=190;
+    function draw(t){
+      ctx.clearRect(0,0,1280,720);
+      // edges
+      for(var a=0;a<N;a++){
+        for(var b=a+1;b<N;b++){
+          var dx=nodes[a].x-nodes[b].x, dy=nodes[a].y-nodes[b].y;
+          var d=Math.sqrt(dx*dx+dy*dy);
+          if(d<D){
+            var o=(1-d/D)*.22;
+            ctx.strokeStyle='rgba(167,150,220,'+o+')';
+            ctx.lineWidth=1;
+            ctx.beginPath();ctx.moveTo(nodes[a].x,nodes[a].y);ctx.lineTo(nodes[b].x,nodes[b].y);ctx.stroke();
+          }
+        }
+      }
+      // nodes
+      for(var p=0;p<N;p++){
+        var nd=nodes[p];
+        var pulse=reduce?1:(0.7+0.3*Math.sin(t*0.002+nd.ph));
+        ctx.beginPath();ctx.arc(nd.x,nd.y,nd.r,0,6.283);
+        ctx.fillStyle='rgba('+nd.c+','+(0.85*pulse)+')';
+        ctx.shadowColor='rgba('+nd.c+',.7)';ctx.shadowBlur=10;ctx.fill();ctx.shadowBlur=0;
+        if(!reduce){ nd.x+=nd.vx; nd.y+=nd.vy;
+          if(nd.x<0||nd.x>1280)nd.vx*=-1; if(nd.y<0||nd.y>720)nd.vy*=-1; }
+      }
+      if(!reduce) requestAnimationFrame(draw);
+    }
+    draw(0);
+  }
+  fit(); show(0);
+})();
+</script>
+</body>
+</html>
